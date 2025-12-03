@@ -1,0 +1,4 @@
+[
+  {"id_movimiento": 1, "id_objeto": 1, "tipo_objeto": "producto", "cantidad": 10, "direccion": "salida"},
+  {"id_movimiento": 2, "id_objeto": 2, "tipo_objeto": "pieza", "cantidad": 5, "direccion": "entrada"}
+]

@@ -1,0 +1,8 @@
+[
+  {"id_pieza": "P1", "cantidad": 0, "id_proveedor": 1},
+  {"id_pieza": "P2", "cantidad": 0, "id_proveedor": 2},
+  {"id_pieza": "P3", "cantidad": 0, "id_proveedor": 3},
+  {"id_pieza": "P4", "cantidad": 0, "id_proveedor": 4},
+  {"id_pieza": "P5", "cantidad": 0, "id_proveedor": 5},
+  {"id_pieza": "P6", "cantidad": 0, "id_proveedor": 6}
+]

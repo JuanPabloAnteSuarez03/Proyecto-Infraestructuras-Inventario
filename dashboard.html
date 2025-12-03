@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard Inventario + Fabricación</title>
+  <style>
+    :root {
+      --bg: #0b0f17;
+      --panel: #111827;
+      --accent: #10b981;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --border: #1f2937;
+      --warn: #f59e0b;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: "Inter", Arial, sans-serif; margin: 16px; background: var(--bg); color: var(--text); }
+    h1 { margin: 0 0 4px 0; }
+    p { margin: 0 0 8px 0; color: var(--muted); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
+    button { background: var(--accent); color: #000; border: none; padding: 10px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    button:hover { filter: brightness(1.05); }
+    button:disabled { background: #4b5563; color: #cbd5e1; cursor: not-allowed; }
+    pre { background: #0f172a; color: #93c5fd; padding: 10px; border-radius: 8px; max-height: 260px; overflow: auto; font-size: 13px; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .badge { padding: 4px 8px; border-radius: 6px; background: #1f2937; color: var(--muted); font-size: 12px; }
+    .kpi { display: flex; gap: 12px; flex-wrap: wrap; }
+    .kpi .item { background: #111827; border: 1px solid var(--border); padding: 10px; border-radius: 8px; min-width: 140px; }
+    .kpi .item .label { color: var(--muted); font-size: 12px; }
+    .kpi .item .value { font-size: 18px; font-weight: 700; color: var(--text); }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+    .status-pend { background: #f59e0b; }
+    .status-comp { background: #10b981; }
+    .status-fail { background: #ef4444; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 8px; border-bottom: 1px solid var(--border); }
+    th { text-align: left; color: var(--muted); font-weight: 600; }
+    tr:hover { background: #0f172a; }
+  </style>
+</head>
+<body>
+  <h1>Dashboard Inventario + Fabricación (Simulación)</h1>
+  <p>Host API: <code id="api-host">http://localhost:5000</code></p>
+
+  <div class="grid">
+    <div class="card">
+      <h3>Simular orden (S1 & S2, 1500 c/u)</h3>
+      <div class="row">
+        <button onclick="simularOrdenes()">Encolar órdenes</button>
+        <span class="badge">Asíncrono</span>
+      </div>
+      <p>Calcula faltantes, encola solicitudes de piezas y órdenes de fabricación. Usa plan interno si el externo no responde.</p>
+      <pre id="log"></pre>
+    </div>
+
+    <div class="card">
+      <h3>KPIs rápidos</h3>
+      <div class="kpi">
+        <div class="item"><div class="label">Prod S1 Disponible</div><div class="value" id="kpi-s1"></div></div>
+        <div class="item"><div class="label">Prod S2 Disponible</div><div class="value" id="kpi-s2"></div></div>
+        <div class="item"><div class="label">Piezas P1</div><div class="value" id="kpi-p1"></div></div>
+        <div class="item"><div class="label">Piezas P2</div><div class="value" id="kpi-p2"></div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Productos</h3>
+      <table id="tbl-productos"></table>
+    </div>
+    <div class="card">
+      <h3>Piezas</h3>
+      <table id="tbl-piezas"></table>
+    </div>
+    <div class="card">
+      <h3>Solicitudes de piezas (async)</h3>
+      <table id="tbl-solicitudes"></table>
+    </div>
+    <div class="card">
+      <h3>Órdenes de fabricación</h3>
+      <table id="tbl-ordenes"></table>
+    </div>
+  </div>
+
+  <script>
+    const host = document.getElementById("api-host").textContent.trim();
+    const logEl = document.getElementById("log");
+
+    function log(msg) {
+      logEl.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n` + logEl.textContent;
+    }
+
+    async function getJson(url, opts = {}) {
+      const res = await fetch(url, opts);
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      return res.json();
+    }
+
+    async function refresh() {
+      try {
+        const [prod, piezas, sol, ord] = await Promise.all([
+          getJson(`${host}/api/productos`),
+          getJson(`${host}/api/piezas`),
+          getJson(`${host}/api/proveedores/solicitudes_async`),
+          getJson(`${host}/api/fabricacion/ordenes`),
+        ]);
+        // KPIs
+        const s1 = prod.find(p => p.id_producto === "S1" && p.estado === "Disponible");
+        const s2 = prod.find(p => p.id_producto === "S2" && p.estado === "Disponible");
+        const p1 = piezas.find(p => p.id_pieza === "P1");
+        const p2 = piezas.find(p => p.id_pieza === "P2");
+        document.getElementById("kpi-s1").textContent = s1 ? s1.cantidad : "-";
+        document.getElementById("kpi-s2").textContent = s2 ? s2.cantidad : "-";
+        document.getElementById("kpi-p1").textContent = p1 ? p1.cantidad : "-";
+        document.getElementById("kpi-p2").textContent = p2 ? p2.cantidad : "-";
+
+        renderProductos(prod);
+        renderPiezas(piezas);
+        renderSolicitudes(sol);
+        renderOrdenes(ord);
+      } catch (err) {
+        log(`Error refrescando: ${err.message}`);
+      }
+    }
+
+    function renderProductos(items) {
+      const t = document.getElementById("tbl-productos");
+      t.innerHTML = "<tr><th>Producto</th><th>Estado</th><th>Cantidad</th></tr>" +
+        items.map(p => `<tr><td>${p.id_producto}</td><td>${p.estado}</td><td>${p.cantidad}</td></tr>`).join("");
+    }
+    function renderPiezas(items) {
+      const t = document.getElementById("tbl-piezas");
+      t.innerHTML = "<tr><th>Pieza</th><th>Cantidad</th><th>Proveedor</th></tr>" +
+        items.map(p => `<tr><td>${p.id_pieza}</td><td>${p.cantidad}</td><td>${p.id_proveedor}</td></tr>`).join("");
+    }
+    function renderSolicitudes(items) {
+      const t = document.getElementById("tbl-solicitudes");
+      t.innerHTML = "<tr><th>ID</th><th>Pieza</th><th>Cant</th><th>Estado</th></tr>" +
+        items.map(s => `<tr><td>${s.id}</td><td>${s.id_pieza}</td><td>${s.cantidad}</td><td>${s.estado}</td></tr>`).join("");
+    }
+    function renderOrdenes(items) {
+      const t = document.getElementById("tbl-ordenes");
+      t.innerHTML = "<tr><th>ID</th><th>Prod</th><th>Cant</th><th>Estado</th><th>Tiempo</th></tr>" +
+        items.map(o => {
+          const tiempo = o.tiempo_estimado ?? (o.detalle ? o.detalle.tiempo_total : "");
+          return `<tr><td>${o.id}</td><td>${o.id_producto}</td><td>${o.cantidad}</td><td>${o.estado}</td><td>${tiempo}</td></tr>`;
+        }).join("");
+    }
+
+    async function encolarSolicitudesDesdePlan(codigo, cantidad) {
+      const plan = await getJson(`${host}/api/fabricacion/plan/${codigo}?cantidad=${cantidad}`);
+      const solicitudes = [];
+      for (const m of plan.materiales) {
+        const faltante = Math.max(m.cantidad_requerida - m.cantidad_disponible, 0);
+        if (faltante > 0) {
+          const resp = await getJson(`${host}/api/proveedores/solicitudes_async`, {
+            method: "POST",
+            headers: {"Content-Type":"application/json"},
+            body: JSON.stringify({id_pieza: m.id_pieza, cantidad: faltante})
+          });
+          solicitudes.push(resp.id);
+          log(`Solicitud piezas encolada: ${m.id_pieza} -> ${faltante} (id=${resp.id})`);
+        }
+      }
+      return solicitudes;
+    }
+
+    async function encolarOrden(codigo, cantidad) {
+      const resp = await getJson(`${host}/api/fabricacion/ordenes`, {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({id_producto: codigo, cantidad})
+      });
+      log(`Orden encolada: ${codigo} x${cantidad} (id=${resp.id})`);
+      return resp.id;
+    }
+
+    async function simularOrdenes() {
+      try {
+        log("Calculando faltantes y encolando solicitudes/ordenes para S1 y S2...");
+        const s1Sol = await encolarSolicitudesDesdePlan("S1", 1500);
+        const s2Sol = await encolarSolicitudesDesdePlan("S2", 1500);
+        const ordenS1 = await encolarOrden("S1", 1500);
+        const ordenS2 = await encolarOrden("S2", 1500);
+        log(`Solicitudes S1: ${s1Sol.join(",")} | Solicitudes S2: ${s2Sol.join(",")}`);
+        log(`Ordenes encoladas -> S1:${ordenS1}, S2:${ordenS2}`);
+        refresh();
+      } catch (err) {
+        log(`Error en simulación: ${err.message}`);
+      }
+    }
+
+    setInterval(refresh, 3000);
+    refresh();
+  </script>
+</body>
+</html>

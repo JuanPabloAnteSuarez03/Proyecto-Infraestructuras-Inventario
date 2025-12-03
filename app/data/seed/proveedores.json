@@ -1,0 +1,8 @@
+[
+  {"id_proveedor": 1, "nombre": "Prov1", "cantidad": 200, "tiempo": 5},
+  {"id_proveedor": 2, "nombre": "Prov2", "cantidad": 300, "tiempo": 6},
+  {"id_proveedor": 3, "nombre": "Prov3", "cantidad": 250, "tiempo": 4},
+  {"id_proveedor": 4, "nombre": "Prov4", "cantidad": 400, "tiempo": 7},
+  {"id_proveedor": 5, "nombre": "Prov5", "cantidad": 350, "tiempo": 8},
+  {"id_proveedor": 6, "nombre": "Prov6", "cantidad": 500, "tiempo": 9}
+]
