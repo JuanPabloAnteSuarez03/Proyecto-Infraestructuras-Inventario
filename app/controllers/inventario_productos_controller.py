@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 from marshmallow import ValidationError
 from ..schemas.inventory import (
     InventarioProductoSchema,
@@ -15,10 +16,10 @@ from ..schemas.api_models import (
     Reserva,
     Despacho,
 )
+from ..database import get_db
 from ..services.inventario_productos_service import InventarioProductosService
 
 router = APIRouter(prefix="/api/productos", tags=["productos"])
-service = InventarioProductosService()
 producto_schema = InventarioProductoSchema()
 productos_schema = InventarioProductoSchema(many=True)
 transfer_schema = TransferenciaInventarioSchema()
@@ -28,13 +29,15 @@ ingreso_schema = IngresoInventarioSchema()
 
 
 @router.get("")
-def listar_productos():
+def listar_productos(db: Session = Depends(get_db)):
+    service = InventarioProductosService(db)
     productos = service.list()
     return productos_schema.dump(productos)
 
 
 @router.get("/{producto_id}")
-def listar_estados_producto(producto_id: str):
+def listar_estados_producto(producto_id: str, db: Session = Depends(get_db)):
+    service = InventarioProductosService(db)
     registros = service.list_by_producto(producto_id)
     if not registros:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
@@ -42,7 +45,8 @@ def listar_estados_producto(producto_id: str):
 
 
 @router.get("/{producto_id}/{estado}")
-def obtener_producto(producto_id: str, estado: str):
+def obtener_producto(producto_id: str, estado: str, db: Session = Depends(get_db)):
+    service = InventarioProductosService(db)
     producto = service.retrieve(producto_id, estado)
     if not producto:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
@@ -50,7 +54,8 @@ def obtener_producto(producto_id: str, estado: str):
 
 
 @router.post("", status_code=201)
-def crear_producto(body: ProductoCreate):
+def crear_producto(body: ProductoCreate, db: Session = Depends(get_db)):
+    service = InventarioProductosService(db)
     payload = body.model_dump()
     try:
         data = producto_schema.load(payload)
@@ -61,7 +66,8 @@ def crear_producto(body: ProductoCreate):
 
 
 @router.delete("/{producto_id}/{estado}")
-def eliminar_producto(producto_id: str, estado: str):
+def eliminar_producto(producto_id: str, estado: str, db: Session = Depends(get_db)):
+    service = InventarioProductosService(db)
     eliminado = service.delete(producto_id, estado)
     if not eliminado:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
@@ -69,7 +75,10 @@ def eliminar_producto(producto_id: str, estado: str):
 
 
 @router.put("/{producto_id}/{estado}")
-def actualizar_producto(producto_id: str, estado: str, body: ProductoUpdate):
+def actualizar_producto(
+    producto_id: str, estado: str, body: ProductoUpdate, db: Session = Depends(get_db)
+):
+    service = InventarioProductosService(db)
     payload = body.model_dump()
     payload["id_producto"] = producto_id
     payload["estado"] = estado
@@ -86,25 +95,83 @@ def actualizar_producto(producto_id: str, estado: str, body: ProductoUpdate):
 
 
 @router.post("/ingresos")
-def incrementar_producto(body: IngresoProducto):
+def incrementar_producto(body: IngresoProducto, db: Session = Depends(get_db)):
+    from app.services import OrdenesFabricacionService
+
+    service = InventarioProductosService(db)
     payload = body.model_dump()
     try:
         data = ingreso_schema.load(payload)
     except ValidationError as exc:
         raise HTTPException(status_code=400, detail=exc.messages)
+
+    codigo = data["id_producto"]
+    cantidad = data["cantidad"]
+    estado = data.get("estado", "Disponible")
+
     try:
         producto = service.incrementar(
-            producto_id=data["id_producto"],
-            estado=data.get("estado", "Disponible"),
-            cantidad=data["cantidad"],
+            producto_id=codigo,
+            estado=estado,
+            cantidad=cantidad,
         )
+
+        # Cerrar órdenes esperando fabricación para este producto
+        from app.models.entities import OrdenFabricacion
+
+        # Buscar órdenes y completar la más pequeña primero (para progreso visible)
+        # Ordenar por: 1) cantidad pendiente más pequeña, 2) ID más antiguo (FIFO)
+        orden = (
+            db.query(OrdenFabricacion)
+            .filter(
+                OrdenFabricacion.id_producto == codigo.upper(),
+                OrdenFabricacion.estado == "esperando_fabricacion"
+            )
+            .order_by(
+                OrdenFabricacion.cantidad.asc(),  # Completar órdenes pequeñas primero
+                OrdenFabricacion.id.asc()  # FIFO como desempate
+            )
+            .with_for_update()  # Bloquea la fila - otras transacciones ESPERAN
+            .first()
+        )
+
+        if orden:
+            # Obtener entregas parciales acumuladas (optimizado)
+            detalle = orden.detalle if isinstance(orden.detalle, dict) else {}
+            entrega_acumulada = detalle.get("entrega_acumulada", 0) + cantidad
+
+            # Actualizar detalle con nuevo acumulado (forzar detección de cambio)
+            orden.detalle = {**detalle, "entrega_acumulada": entrega_acumulada}
+
+            # Actualizar estado si se completó la orden
+            completada = entrega_acumulada >= orden.cantidad
+            if completada:
+                orden.estado = "completada"
+
+            # Commit ÚNICO (más rápido)
+            db.commit()
+
+            # Logging fuera de la transacción (no bloquea)
+            if completada:
+                print(
+                    f"[INGRESO] ✓ Orden #{orden.id} completada. "
+                    f"Pedido: {orden.cantidad}, recibido total: {entrega_acumulada} "
+                    f"(última entrega: {cantidad})"
+                )
+            else:
+                print(
+                    f"[INGRESO] ⚠️ Entrega parcial para orden #{orden.id}: "
+                    f"recibido {cantidad}, acumulado {entrega_acumulada} de {orden.cantidad}"
+                )
+
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return producto_schema.dump(producto)
 
 
 @router.post("/transferencias")
-def transferir_producto(body: Transferencia):
+def transferir_producto(body: Transferencia, db: Session = Depends(get_db)):
+    service = InventarioProductosService(db)
     payload = body.model_dump()
     try:
         data = transfer_schema.load(payload)
@@ -123,7 +190,8 @@ def transferir_producto(body: Transferencia):
 
 
 @router.post("/reservas")
-def reservar_producto(body: Reserva):
+def reservar_producto(body: Reserva, db: Session = Depends(get_db)):
+    service = InventarioProductosService(db)
     payload = body.model_dump()
     try:
         data = reserva_schema.load(payload)
@@ -139,7 +207,8 @@ def reservar_producto(body: Reserva):
 
 
 @router.post("/despachos")
-def despachar_producto(body: Despacho):
+def despachar_producto(body: Despacho, db: Session = Depends(get_db)):
+    service = InventarioProductosService(db)
     payload = body.model_dump()
     try:
         data = despacho_schema.load(payload)

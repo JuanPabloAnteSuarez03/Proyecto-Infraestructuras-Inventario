@@ -33,8 +33,8 @@ app/
    ```
 3. Dentro del contenedor `api`, cree las tablas y cargue datos de ejemplo (JSON en `app/data/seed`):
    ```bash
-   docker compose exec api python -c "from app import create_app; from app.extensions import db; create_app(); db.create_all()"
-   docker compose exec api python -c "from app import create_app; from app.services.seed_service import load_seed_data; create_app(); load_seed_data()"
+   docker compose exec api python -m app.cli create-db
+   docker compose exec api python -m app.cli seed-db
    ```
 4. La API quedará disponible en `http://localhost:5000`.
    - La base de datos PostgreSQL queda expuesta en `localhost:5433` (útil si deseas conectarte con un cliente externo).

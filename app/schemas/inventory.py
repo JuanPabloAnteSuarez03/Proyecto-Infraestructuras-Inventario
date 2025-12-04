@@ -1,13 +1,13 @@
-from marshmallow import fields, validate
-from ..extensions import ma
+from marshmallow import Schema, fields, validate, pre_load
+from marshmallow_sqlalchemy import SQLAlchemyAutoSchema, auto_field
 from ..models import InventarioProducto, InventarioPieza, Proveedor, Movimiento
 from ..domain import PRODUCT_CODES, PRODUCT_STATES
 
 
-class InventarioProductoSchema(ma.SQLAlchemyAutoSchema):
-    id_producto = ma.auto_field(required=True, validate=validate.OneOf(PRODUCT_CODES))
-    estado = ma.auto_field(required=True, validate=validate.OneOf(PRODUCT_STATES))
-    cantidad = ma.auto_field(required=True)
+class InventarioProductoSchema(SQLAlchemyAutoSchema):
+    id_producto = auto_field(required=True, validate=validate.OneOf(PRODUCT_CODES))
+    estado = auto_field(required=True, validate=validate.OneOf(PRODUCT_STATES))
+    cantidad = auto_field(required=True)
 
     class Meta:
         model = InventarioProducto
@@ -15,30 +15,30 @@ class InventarioProductoSchema(ma.SQLAlchemyAutoSchema):
         load_instance = False
 
 
-class InventarioPiezaSchema(ma.SQLAlchemyAutoSchema):
+class InventarioPiezaSchema(SQLAlchemyAutoSchema):
     class Meta:
         model = InventarioPieza
         include_fk = True
         load_instance = False
 
 
-class ProveedorSchema(ma.SQLAlchemyAutoSchema):
+class ProveedorSchema(SQLAlchemyAutoSchema):
     class Meta:
         model = Proveedor
         include_fk = True
         load_instance = False
 
-    piezas = ma.Nested("InventarioPiezaSchema", many=True)
+    piezas = fields.Nested("InventarioPiezaSchema", many=True)
 
 
-class MovimientoSchema(ma.SQLAlchemyAutoSchema):
+class MovimientoSchema(SQLAlchemyAutoSchema):
     class Meta:
         model = Movimiento
         include_fk = True
         load_instance = False
 
 
-class TransferenciaInventarioSchema(ma.Schema):
+class TransferenciaInventarioSchema(Schema):
     id_producto = fields.String(
         required=True, validate=validate.OneOf(PRODUCT_CODES)
     )
@@ -51,21 +51,21 @@ class TransferenciaInventarioSchema(ma.Schema):
     cantidad = fields.Integer(required=True, validate=validate.Range(min=1))
 
 
-class SolicitudReservaSchema(ma.Schema):
+class SolicitudReservaSchema(Schema):
     id_producto = fields.String(
         required=True, validate=validate.OneOf(PRODUCT_CODES)
     )
     cantidad = fields.Integer(required=True, validate=validate.Range(min=1))
 
 
-class SolicitudDespachoSchema(ma.Schema):
+class SolicitudDespachoSchema(Schema):
     id_producto = fields.String(
         required=True, validate=validate.OneOf(PRODUCT_CODES)
     )
     cantidad = fields.Integer(required=True, validate=validate.Range(min=1))
 
 
-class IngresoInventarioSchema(ma.Schema):
+class IngresoInventarioSchema(Schema):
     id_producto = fields.String(
         required=True, validate=validate.OneOf(PRODUCT_CODES)
     )
@@ -74,19 +74,26 @@ class IngresoInventarioSchema(ma.Schema):
         load_default="Disponible", validate=validate.OneOf(PRODUCT_STATES)
     )
 
+    @pre_load
+    def normalize_producto_field(self, data, **kwargs):
+        """Acepta 'codigo' como alias de 'id_producto' para compatibilidad con fábrica externa"""
+        if "codigo" in data and "id_producto" not in data:
+            data["id_producto"] = data.pop("codigo")
+        return data
 
-class SolicitudFabricacionSchema(ma.Schema):
+
+class SolicitudFabricacionSchema(Schema):
     id_producto = fields.String(
         required=True, validate=validate.OneOf(PRODUCT_CODES)
     )
     cantidad = fields.Integer(required=True, validate=validate.Range(min=1))
 
 
-class SolicitudPiezasSchema(ma.Schema):
+class SolicitudPiezasSchema(Schema):
     id_pieza = fields.String(required=True)
     cantidad = fields.Integer(required=True, validate=validate.Range(min=1))
 
 
-class SolicitudCalculoPiezasSchema(ma.Schema):
+class SolicitudCalculoPiezasSchema(Schema):
     codigo = fields.String(required=True, validate=validate.OneOf(PRODUCT_CODES))
     cantidad = fields.Integer(required=True, validate=validate.Range(min=1))

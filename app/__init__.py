@@ -1,36 +1,20 @@
 import os
-from flask import Flask
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from .config import get_config
-from .extensions import db, ma
 from .routes import register_routes
-
-
-def _init_flask_context(config_name: str) -> Flask:
-    flask_app = Flask(__name__)
-    flask_app.config.from_object(get_config(config_name))
-    db.init_app(flask_app)
-    ma.init_app(flask_app)
-    flask_app.app_context().push()
-    return flask_app
+from .database import Base, engine
 
 
 def create_app(config_name: str | None = None) -> FastAPI:
-    """Factory que crea la app FastAPI reutilizando el contexto de Flask para SQLAlchemy/Marshmallow."""
+    """Factory FastAPI con SQLAlchemy puro (sin Flask)."""
     env_config = config_name or os.getenv("FLASK_ENV", "development")
-    _init_flask_context(env_config)
 
     app = FastAPI(title="API Inventarios", version="1.0.0")
 
-    @app.middleware("http")
-    async def db_session_middleware(request: Request, call_next):
-        try:
-            response = await call_next(request)
-            return response
-        finally:
-            db.session.remove()
+    @app.on_event("startup")
+    def _init_models() -> None:
+        Base.metadata.create_all(bind=engine)
 
     app.add_middleware(
         CORSMiddleware,

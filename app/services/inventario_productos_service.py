@@ -1,29 +1,33 @@
 from __future__ import annotations
 from typing import Any
+from sqlalchemy.orm import Session
 from ..repositories import (
     InventarioProductosRepository,
     InventarioPiezasRepository,
 )
 from ..models import InventarioProducto, Proveedor
-from ..extensions import db
-from ..domain import (
-    normalize_estado,
-    normalize_producto_codigo,
-)
+from ..domain import normalize_estado, normalize_producto_codigo
 from .fabricacion_service import FabricacionService
 from .proveedores_service import ProveedoresService
 
 
 class InventarioProductosService:
-    def __init__(self, repository: InventarioProductosRepository | None = None) -> None:
-        self.repository = repository or InventarioProductosRepository()
-        self.piezas_repository = InventarioPiezasRepository()
+    def __init__(
+        self,
+        session: Session,
+        repository: InventarioProductosRepository | None = None,
+        piezas_repository: InventarioPiezasRepository | None = None,
+    ) -> None:
+        self.session = session
+        self.repository = repository or InventarioProductosRepository(session)
+        self.piezas_repository = piezas_repository or InventarioPiezasRepository(session)
         self.fabricacion_service = FabricacionService()
-        self.proveedores_service = ProveedoresService(piezas_repository=self.piezas_repository)
+        self.proveedores_service = ProveedoresService(
+            session, piezas_repository=self.piezas_repository
+        )
         self.stock_minimo = 500
         self.stock_objetivo = 1000
         self.lote_produccion = 500
-        # Umbrales para piezas (insumos)
         self.piezas_stock_minimo = 500
         self.piezas_stock_objetivo = 1000
 
@@ -33,7 +37,8 @@ class InventarioProductosService:
     def list_by_producto(self, producto_id: str) -> list[InventarioProducto]:
         codigo = normalize_producto_codigo(producto_id)
         return (
-            InventarioProducto.query.filter_by(id_producto=codigo)
+            self.session.query(InventarioProducto)
+            .filter_by(id_producto=codigo)
             .order_by(InventarioProducto.estado)
             .all()
         )
@@ -70,7 +75,7 @@ class InventarioProductosService:
         registro = self.repository.get_by_id((codigo, estado_normalizado))
         if registro:
             registro.cantidad += cantidad
-            db.session.commit()
+            self.session.commit()
             return registro
         return self.repository.create(
             id_producto=codigo, estado=estado_normalizado, cantidad=cantidad
@@ -98,13 +103,11 @@ class InventarioProductosService:
 
         origen_registro.cantidad -= cantidad
         destino_registro.cantidad += cantidad
-        db.session.commit()
+        self.session.commit()
 
         return self.list_by_producto(codigo)
 
-    def reservar_para_venta(
-        self, producto_id: str, cantidad: int
-    ) -> dict[str, Any]:
+    def reservar_para_venta(self, producto_id: str, cantidad: int) -> dict[str, Any]:
         codigo = normalize_producto_codigo(producto_id)
         if cantidad <= 0:
             raise ValueError("Cantidad debe ser mayor a cero")
@@ -142,7 +145,9 @@ class InventarioProductosService:
             )
             desde_stock = disponible_actual.cantidad if disponible_actual else 0
             if desde_stock > 0:
-                self.transferir(codigo, "Disponible", "Reservado", min(desde_stock, cantidad))
+                self.transferir(
+                    codigo, "Disponible", "Reservado", min(desde_stock, cantidad)
+                )
             faltante = max(cantidad - desde_stock, 0)
             resultado_fabricacion = self._producir_para_venta(codigo, faltante)
             registros = self.list_by_producto(codigo)
@@ -176,9 +181,7 @@ class InventarioProductosService:
         )
         return respuesta
 
-    def despachar_para_venta(
-        self, producto_id: str, cantidad: int
-    ) -> dict[str, Any]:
+    def despachar_para_venta(self, producto_id: str, cantidad: int) -> dict[str, Any]:
         codigo = normalize_producto_codigo(producto_id)
         if cantidad <= 0:
             raise ValueError("Cantidad debe ser mayor a cero")
@@ -229,17 +232,21 @@ class InventarioProductosService:
         if cantidad <= 0:
             raise ValueError("La cantidad debe ser mayor a cero")
         resultado = self._producir_lote(codigo, cantidad)
+        disponible = self.repository.get_by_id((codigo, "Disponible"))
+        disponible_actual = disponible.cantidad if disponible else 0
         return {
             "id_producto": codigo,
             "cantidad_producida": cantidad,
             "tiempo_reabastecimiento": resultado["tiempo_reabastecimiento"],
             "tiempo_produccion": resultado["tiempo_produccion"],
             "tiempo_total": resultado["tiempo_total"],
-            "inventario_disponible": self.repository.get_by_id((codigo, "Disponible")).cantidad,
+            "inventario_disponible": disponible_actual,
         }
 
     def _tiempo_estimado_reposicion(self) -> int:
-        proveedor = Proveedor.query.order_by(Proveedor.tiempo).first()
+        proveedor = (
+            self.session.query(Proveedor).order_by(Proveedor.tiempo).first()
+        )
         return proveedor.tiempo if proveedor else 0
 
     def _normalize_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -276,7 +283,11 @@ class InventarioProductosService:
 
     def _producir_para_venta(self, codigo: str, cantidad: int) -> dict[str, int]:
         if cantidad <= 0:
-            return {"tiempo_total": 0, "tiempo_reabastecimiento": 0, "tiempo_produccion": 0}
+            return {
+                "tiempo_total": 0,
+                "tiempo_reabastecimiento": 0,
+                "tiempo_produccion": 0,
+            }
         return self._producir_lote(codigo, cantidad, estado_destino="A Despacho")
 
     def _producir_lote(
@@ -284,22 +295,58 @@ class InventarioProductosService:
     ) -> dict[str, int]:
         plan = self.fabricacion_service.solicitar_plan(codigo, cantidad)
         tiempo_reabastecimiento = self._asegurar_piezas(plan.materiales)
+
+        piezas_suficientes = True
         for material in plan.materiales:
             pieza = self.piezas_repository.get_by_id(material["id_pieza"])
-            pieza.cantidad -= material["cantidad"]
-        db.session.commit()
+            if not pieza or pieza.cantidad < material["cantidad"]:
+                piezas_suficientes = False
+                break
+
+        if not piezas_suficientes:
+            raise ValueError("No hay suficientes piezas disponibles para fabricar")
+
+        confirmacion = self.fabricacion_service.confirmar_fabricacion_externa(
+            codigo, cantidad
+        )
+
+        if confirmacion and confirmacion.get("status") == "ok":
+            for material in plan.materiales:
+                pieza = self.piezas_repository.get_by_id(material["id_pieza"])
+                if pieza:
+                    pieza.cantidad -= material["cantidad"]
+            self.session.commit()
+            return {
+                "tiempo_total": tiempo_reabastecimiento + plan.tiempo_produccion,
+                "tiempo_produccion": plan.tiempo_produccion,
+                "tiempo_reabastecimiento": tiempo_reabastecimiento,
+                "fabricacion_externa": True,
+                "estado_fabricacion": "enviado_a_fabrica_externa",
+                "mensaje": f"Piezas enviadas a fábrica. Esperando productos de {codigo} x{cantidad}",
+            }
+
+        # Fallback local cuando no hay fábrica externa disponible
+        for material in plan.materiales:
+            pieza = self.piezas_repository.get_by_id(material["id_pieza"])
+            if pieza:
+                pieza.cantidad -= material["cantidad"]
+
         registro_destino = self.repository.get_by_id((codigo, estado_destino))
         if not registro_destino:
             registro_destino = InventarioProducto(
                 id_producto=codigo, estado=estado_destino, cantidad=0
             )
-            db.session.add(registro_destino)
+            self.session.add(registro_destino)
         registro_destino.cantidad += cantidad
-        db.session.commit()
+        self.session.commit()
+
         return {
             "tiempo_total": tiempo_reabastecimiento + plan.tiempo_produccion,
             "tiempo_produccion": plan.tiempo_produccion,
             "tiempo_reabastecimiento": tiempo_reabastecimiento,
+            "fabricacion_externa": False,
+            "estado_fabricacion": "local",
+            "mensaje": f"Producción local completada para {codigo} x{cantidad}",
         }
 
     def _asegurar_piezas(self, materiales: list[dict]) -> int:
@@ -310,11 +357,14 @@ class InventarioProductosService:
                 raise ValueError(f"No existe la pieza {material['id_pieza']}")
             saldo_post_consumo = pieza.cantidad - material["cantidad"]
             if saldo_post_consumo < self.piezas_stock_minimo:
-                faltante = max(self.piezas_stock_objetivo - pieza.cantidad, 0)
+                faltante = max(
+                    material["cantidad"] + self.piezas_stock_objetivo - pieza.cantidad,
+                    0,
+                )
                 if faltante > 0:
                     resultado = self.proveedores_service.solicitar_piezas(
                         pieza.id_pieza, faltante
                     )
                     tiempo_max = max(tiempo_max, resultado["tiempo_entrega"])
-        db.session.commit()
+        self.session.commit()
         return tiempo_max

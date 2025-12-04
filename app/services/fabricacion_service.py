@@ -15,6 +15,8 @@ class FabricacionService:
     def __init__(self) -> None:
         self.base_url = os.getenv("FABRICA_BASE_URL", "").rstrip("/")
         self.plano_mapping = {"S1": 1, "S2": 2}
+        # Mapeo de códigos internos a códigos de fábrica externa
+        self.codigo_externo_mapping = {"S1": "1", "S2": "S2"}
 
     def _tiempo_desde_fabrica(self, codigo: str) -> int | None:
         if not self.base_url:
@@ -35,9 +37,13 @@ class FabricacionService:
         """Intenta usar el endpoint externo /fabricacion/calculo_piezas."""
         if not self.base_url:
             return None
+
+        # Mapear código interno al código que usa la fábrica externa
+        codigo_externo = self.codigo_externo_mapping.get(codigo.upper(), codigo)
+
         url = f"{self.base_url}/fabricacion/calculo_piezas"
         try:
-            resp = httpx.post(url, json={"codigo": codigo, "cantidad": cantidad}, timeout=5)
+            resp = httpx.post(url, json={"codigo": codigo_externo, "cantidad": cantidad}, timeout=5)
             resp.raise_for_status()
             data = resp.json()
             materiales = []
@@ -81,3 +87,27 @@ class FabricacionService:
             )
         tiempo_produccion = tiempo * max(cantidad // 100, 1)
         return PlanFabricacion(materiales=materiales, tiempo_produccion=tiempo_produccion)
+
+    def confirmar_fabricacion_externa(self, codigo: str, cantidad: int) -> dict | None:
+        """Envía orden de fabricación al servicio externo y retorna confirmación"""
+        if not self.base_url:
+            return None
+
+        # Mapear código interno al código que usa la fábrica externa
+        codigo_externo = self.codigo_externo_mapping.get(codigo.upper(), codigo)
+
+        url = f"{self.base_url}/fabricacion/confirmar_fabricacion"
+        try:
+            resp = httpx.post(
+                url,
+                json={
+                    "codigo": codigo_externo,
+                    "cantidad": cantidad
+                },
+                timeout=10
+            )
+            resp.raise_for_status()
+            return resp.json()
+        except Exception as e:
+            print(f"[ERROR] Fallo al confirmar con fábrica externa: {e}")
+            return None

@@ -1,11 +1,13 @@
 from typing import Any
+from sqlalchemy.orm import Session
 from ..repositories import InventarioPiezasRepository
 from ..models import InventarioPieza
 
 
 class InventarioPiezasService:
-    def __init__(self, repository: InventarioPiezasRepository | None = None) -> None:
-        self.repository = repository or InventarioPiezasRepository()
+    def __init__(self, session: Session, repository: InventarioPiezasRepository | None = None) -> None:
+        self.session = session
+        self.repository = repository or InventarioPiezasRepository(session)
 
     def list(self) -> list[InventarioPieza]:
         return self.repository.get_all()

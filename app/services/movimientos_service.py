@@ -1,11 +1,13 @@
 from typing import Any
+from sqlalchemy.orm import Session
 from ..repositories import MovimientosRepository
 from ..models import Movimiento
 
 
 class MovimientosService:
-    def __init__(self, repository: MovimientosRepository | None = None) -> None:
-        self.repository = repository or MovimientosRepository()
+    def __init__(self, session: Session, repository: MovimientosRepository | None = None) -> None:
+        self.session = session
+        self.repository = repository or MovimientosRepository(session)
 
     def list(self) -> list[Movimiento]:
         return self.repository.get_all()

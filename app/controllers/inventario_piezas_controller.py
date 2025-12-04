@@ -1,23 +1,26 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 from marshmallow import ValidationError
 from ..schemas.inventory import InventarioPiezaSchema
 from ..schemas.api_models import PiezaCreate, PiezaUpdate
+from ..database import get_db
 from ..services.inventario_piezas_service import InventarioPiezasService
 
 router = APIRouter(prefix="/api/piezas", tags=["piezas"])
-service = InventarioPiezasService()
 pieza_schema = InventarioPiezaSchema()
 piezas_schema = InventarioPiezaSchema(many=True)
 
 
 @router.get("")
-def listar_piezas():
+def listar_piezas(db: Session = Depends(get_db)):
+    service = InventarioPiezasService(db)
     piezas = service.list()
     return piezas_schema.dump(piezas)
 
 
 @router.get("/{pieza_id}")
-def obtener_pieza(pieza_id: str):
+def obtener_pieza(pieza_id: str, db: Session = Depends(get_db)):
+    service = InventarioPiezasService(db)
     pieza = service.retrieve(pieza_id)
     if not pieza:
         raise HTTPException(status_code=404, detail="Pieza no encontrada")
@@ -25,7 +28,8 @@ def obtener_pieza(pieza_id: str):
 
 
 @router.post("", status_code=201)
-def crear_pieza(body: PiezaCreate):
+def crear_pieza(body: PiezaCreate, db: Session = Depends(get_db)):
+    service = InventarioPiezasService(db)
     payload = body.model_dump()
     try:
         data = pieza_schema.load(payload)
@@ -36,7 +40,8 @@ def crear_pieza(body: PiezaCreate):
 
 
 @router.delete("/{pieza_id}")
-def eliminar_pieza(pieza_id: str):
+def eliminar_pieza(pieza_id: str, db: Session = Depends(get_db)):
+    service = InventarioPiezasService(db)
     eliminado = service.delete(pieza_id)
     if not eliminado:
         raise HTTPException(status_code=404, detail="Pieza no encontrada")
@@ -44,7 +49,8 @@ def eliminar_pieza(pieza_id: str):
 
 
 @router.put("/{pieza_id}")
-def actualizar_pieza(pieza_id: str, body: PiezaUpdate):
+def actualizar_pieza(pieza_id: str, body: PiezaUpdate, db: Session = Depends(get_db)):
+    service = InventarioPiezasService(db)
     payload = body.model_dump(exclude_unset=True)
     try:
         data = pieza_schema.load(payload, partial=True)

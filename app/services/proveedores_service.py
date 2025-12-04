@@ -1,13 +1,19 @@
 from typing import Any
+from sqlalchemy.orm import Session
 from ..repositories import ProveedoresRepository, InventarioPiezasRepository
 from ..models import Proveedor
-from ..extensions import db
 
 
 class ProveedoresService:
-    def __init__(self, repository: ProveedoresRepository | None = None, piezas_repository: InventarioPiezasRepository | None = None) -> None:
-        self.repository = repository or ProveedoresRepository()
-        self.piezas_repository = piezas_repository or InventarioPiezasRepository()
+    def __init__(
+        self,
+        session: Session,
+        repository: ProveedoresRepository | None = None,
+        piezas_repository: InventarioPiezasRepository | None = None,
+    ) -> None:
+        self.session = session
+        self.repository = repository or ProveedoresRepository(session)
+        self.piezas_repository = piezas_repository or InventarioPiezasRepository(session)
 
     def list(self) -> list[Proveedor]:
         return self.repository.get_all()
@@ -33,7 +39,7 @@ class ProveedoresService:
         proveedor = pieza.proveedor or self.retrieve(pieza.id_proveedor)
         tiempo = proveedor.tiempo if proveedor else 0
         pieza.cantidad += cantidad
-        db.session.commit()
+        self.session.commit()
         return {
             "id_pieza": pieza_id,
             "id_proveedor": pieza.id_proveedor,

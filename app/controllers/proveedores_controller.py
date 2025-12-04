@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 from marshmallow import ValidationError
 from ..schemas.inventory import ProveedorSchema, SolicitudPiezasSchema
 from ..schemas.api_models import (
@@ -7,26 +8,27 @@ from ..schemas.api_models import (
     SolicitudPiezas,
     SolicitudPiezaAsync,
 )
+from ..database import get_db
 from ..services.proveedores_service import ProveedoresService
 from ..services import SolicitudesPiezaService
 from ..tasks import queue, procesar_solicitud_pieza
 
 router = APIRouter(prefix="/api/proveedores", tags=["proveedores"])
-service = ProveedoresService()
-solicitudes_service = SolicitudesPiezaService()
 proveedor_schema = ProveedorSchema()
 proveedores_schema = ProveedorSchema(many=True)
 solicitud_piezas_schema = SolicitudPiezasSchema()
 
 
 @router.get("")
-def listar_proveedores():
+def listar_proveedores(db: Session = Depends(get_db)):
+    service = ProveedoresService(db)
     proveedores = service.list()
     return proveedores_schema.dump(proveedores)
 
 
 @router.post("", status_code=201)
-def crear_proveedor(body: ProveedorCreate):
+def crear_proveedor(body: ProveedorCreate, db: Session = Depends(get_db)):
+    service = ProveedoresService(db)
     payload = body.model_dump()
     try:
         data = proveedor_schema.load(payload)
@@ -37,7 +39,8 @@ def crear_proveedor(body: ProveedorCreate):
 
 
 @router.delete("/{proveedor_id}")
-def eliminar_proveedor(proveedor_id: int):
+def eliminar_proveedor(proveedor_id: int, db: Session = Depends(get_db)):
+    service = ProveedoresService(db)
     eliminado = service.delete(proveedor_id)
     if not eliminado:
         raise HTTPException(status_code=404, detail="Proveedor no encontrado")
@@ -45,7 +48,10 @@ def eliminar_proveedor(proveedor_id: int):
 
 
 @router.put("/{proveedor_id}")
-def actualizar_proveedor(proveedor_id: int, body: ProveedorUpdate):
+def actualizar_proveedor(
+    proveedor_id: int, body: ProveedorUpdate, db: Session = Depends(get_db)
+):
+    service = ProveedoresService(db)
     payload = body.model_dump(exclude_unset=True)
     try:
         data = proveedor_schema.load(payload, partial=True)
@@ -59,7 +65,8 @@ def actualizar_proveedor(proveedor_id: int, body: ProveedorUpdate):
 
 
 @router.post("/solicitudes")
-def solicitar_piezas(body: SolicitudPiezas):
+def solicitar_piezas(body: SolicitudPiezas, db: Session = Depends(get_db)):
+    service = ProveedoresService(db)
     payload = body.model_dump()
     try:
         data = solicitud_piezas_schema.load(payload)
@@ -75,7 +82,8 @@ def solicitar_piezas(body: SolicitudPiezas):
 
 
 @router.post("/solicitudes_async", status_code=202)
-def solicitar_piezas_async(body: SolicitudPiezaAsync):
+def solicitar_piezas_async(body: SolicitudPiezaAsync, db: Session = Depends(get_db)):
+    solicitudes_service = SolicitudesPiezaService(db)
     payload = body.model_dump()
     try:
         data = solicitud_piezas_schema.load(payload)
@@ -93,7 +101,8 @@ def solicitar_piezas_async(body: SolicitudPiezaAsync):
 
 
 @router.get("/solicitudes_async/{solicitud_id}")
-def obtener_solicitud_async(solicitud_id: int):
+def obtener_solicitud_async(solicitud_id: int, db: Session = Depends(get_db)):
+    solicitudes_service = SolicitudesPiezaService(db)
     solicitud = solicitudes_service.retrieve(solicitud_id)
     if not solicitud:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
@@ -107,7 +116,8 @@ def obtener_solicitud_async(solicitud_id: int):
 
 
 @router.get("/solicitudes_async")
-def listar_solicitudes_async():
+def listar_solicitudes_async(db: Session = Depends(get_db)):
+    solicitudes_service = SolicitudesPiezaService(db)
     solicitudes = solicitudes_service.list()
     return [
         {
@@ -122,7 +132,8 @@ def listar_solicitudes_async():
 
 
 @router.get("/{proveedor_id}")
-def obtener_proveedor(proveedor_id: int):
+def obtener_proveedor(proveedor_id: int, db: Session = Depends(get_db)):
+    service = ProveedoresService(db)
     proveedor = service.retrieve(proveedor_id)
     if not proveedor:
         raise HTTPException(status_code=404, detail="Proveedor no encontrado")

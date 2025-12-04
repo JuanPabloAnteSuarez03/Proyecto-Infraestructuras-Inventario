@@ -1,41 +1,46 @@
 from __future__ import annotations
-from typing import Any, Type
-from ..extensions import db
+from typing import Any, Type, TypeVar
+from sqlalchemy.orm import Session
+
+ModelType = TypeVar("ModelType")
 
 
 class BaseRepository:
-    def __init__(self, model: Type[db.Model]):
+    def __init__(self, model: Type[ModelType], session: Session):
         self.model = model
+        self.session = session
 
-    def get_all(self) -> list[db.Model]:
-        return self.model.query.all()
+    def get_all(self) -> list[ModelType]:
+        return self.session.query(self.model).all()
 
-    def get_by_id(self, record_id: Any) -> db.Model | None:
-        return db.session.get(self.model, record_id)
+    def get_by_id(self, record_id: Any) -> ModelType | None:
+        return self.session.get(self.model, record_id)
 
-    def create(self, **kwargs) -> db.Model:
+    def create(self, **kwargs) -> ModelType:
         record = self.model(**kwargs)
-        db.session.add(record)
-        db.session.commit()
+        self.session.add(record)
+        self.session.commit()
+        self.session.refresh(record)
         return record
 
     def delete(self, record_id: Any) -> bool:
         record = self.get_by_id(record_id)
         if not record:
             return False
-        db.session.delete(record)
-        db.session.commit()
+        self.session.delete(record)
+        self.session.commit()
         return True
 
     def bulk_insert(self, payload: list[dict]) -> None:
-        db.session.bulk_insert_mappings(self.model, payload)
-        db.session.commit()
+        self.session.bulk_insert_mappings(self.model, payload)
+        self.session.commit()
 
-    def update(self, record_id: Any, **kwargs) -> db.Model | None:
+    def update(self, record_id: Any, **kwargs) -> ModelType | None:
         record = self.get_by_id(record_id)
         if not record:
             return None
         for key, value in kwargs.items():
             setattr(record, key, value)
-        db.session.commit()
+        self.session.commit()
+        self.session.refresh(record)
         return record

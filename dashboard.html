@@ -22,6 +22,7 @@
     button { background: var(--accent); color: #000; border: none; padding: 10px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; }
     button:hover { filter: brightness(1.05); }
     button:disabled { background: #4b5563; color: #cbd5e1; cursor: not-allowed; }
+    input { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; }
     pre { background: #0f172a; color: #93c5fd; padding: 10px; border-radius: 8px; max-height: 260px; overflow: auto; font-size: 13px; }
     .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .badge { padding: 4px 8px; border-radius: 6px; background: #1f2937; color: var(--muted); font-size: 12px; }
@@ -30,9 +31,21 @@
     .kpi .item .label { color: var(--muted); font-size: 12px; }
     .kpi .item .value { font-size: 18px; font-weight: 700; color: var(--text); }
     .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
-    .status-pend { background: #f59e0b; }
-    .status-comp { background: #10b981; }
-    .status-fail { background: #ef4444; }
+    .status-pending { background: #6b7280; }
+    .status-pendiente { background: #6b7280; }
+    .status-calculando { background: #8b5cf6; animation: pulse 2s infinite; }
+    .status-confirmando { background: #06b6d4; animation: pulse 2s infinite; }
+    .status-confirmado { background: #10b981; }
+    .status-confirmacion_fallida { background: #f97316; }
+    .status-consumiendo_piezas { background: #eab308; animation: pulse 2s infinite; }
+    .status-en_proceso { background: #3b82f6; }
+    .status-esperando_fabricacion { background: #f59e0b; animation: pulse 2s infinite; }
+    .status-completada { background: #10b981; }
+    .status-fallida { background: #ef4444; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
     th, td { padding: 8px; border-bottom: 1px solid var(--border); }
     th { text-align: left; color: var(--muted); font-weight: 600; }
@@ -40,22 +53,74 @@
   </style>
 </head>
 <body>
-  <h1>Dashboard Inventario + Fabricación (Simulación)</h1>
-  <p>Host API: <code id="api-host">http://localhost:5000</code></p>
+  <div class="row" style="justify-content: space-between; align-items: flex-end; gap: 14px; margin-bottom: 6px;">
+    <div>
+      <h1>Dashboard Inventario + Fabricación (Simulación)</h1>
+      <p>Host API: <code id="api-host"></code></p>
+    </div>
+    <div class="row">
+      <input id="api-host-input" type="text" placeholder="http://localhost:5050" style="min-width: 220px;">
+      <button onclick="setHost()">Actualizar host</button>
+      <button onclick="refresh()" style="background: #3b82f6;">Refrescar datos</button>
+    </div>
+  </div>
 
   <div class="grid">
     <div class="card">
-      <h3>Simular orden (S1 & S2, 1500 c/u)</h3>
-      <div class="row">
-        <button onclick="simularOrdenes()">Encolar órdenes</button>
-        <span class="badge">Asíncrono</span>
+      <h3>Monitor Servicio Externo de Fabricación</h3>
+      <div class="kpi">
+        <div class="item">
+          <div class="label">Estado Conexión</div>
+          <div class="value" id="ext-status">Verificando...</div>
+        </div>
+        <div class="item">
+          <div class="label">Plano S1</div>
+          <div class="value" id="ext-s1">-</div>
+        </div>
+        <div class="item">
+          <div class="label">Plano S2</div>
+          <div class="value" id="ext-s2">-</div>
+        </div>
       </div>
-      <p>Calcula faltantes, encola solicitudes de piezas y órdenes de fabricación. Usa plan interno si el externo no responde.</p>
+      <p style="font-size: 12px; margin-top: 8px;">🔗 <code id="ext-base">Sin configurar</code></p>
+    </div>
+
+    <div class="card">
+      <h3>Control de Órdenes</h3>
+      <div style="display: grid; gap: 12px;">
+        <div>
+          <div class="row" style="margin-bottom: 8px;">
+            <strong>Producto S1</strong>
+            <input type="number" id="qty-s1" value="1500" min="100" step="100" style="width: 100px; padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
+          </div>
+          <div class="row">
+            <button onclick="encolarOrdenIndividual('S1')">Encolar S1</button>
+            <button onclick="verificarPlan('S1')" style="background: #3b82f6;">Ver Plan</button>
+          </div>
+        </div>
+        <div>
+          <div class="row" style="margin-bottom: 8px;">
+            <strong>Producto S2</strong>
+            <input type="number" id="qty-s2" value="1500" min="100" step="100" style="width: 100px; padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
+          </div>
+          <div class="row">
+            <button onclick="encolarOrdenIndividual('S2')">Encolar S2</button>
+            <button onclick="verificarPlan('S2')" style="background: #3b82f6;">Ver Plan</button>
+          </div>
+        </div>
+        <div style="border-top: 1px solid var(--border); padding-top: 12px;">
+          <button onclick="simularOrdenes()" style="width: 100%;">🚀 Encolar S1 + S2 (Simulación completa)</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Logs de Integración</h3>
       <pre id="log"></pre>
     </div>
 
     <div class="card">
-      <h3>KPIs rápidos</h3>
+      <h3>KPIs Inventario</h3>
       <div class="kpi">
         <div class="item"><div class="label">Prod S1 Disponible</div><div class="value" id="kpi-s1"></div></div>
         <div class="item"><div class="label">Prod S2 Disponible</div><div class="value" id="kpi-s2"></div></div>
@@ -77,17 +142,45 @@
       <table id="tbl-solicitudes"></table>
     </div>
     <div class="card">
-      <h3>Órdenes de fabricación</h3>
+      <h3>Órdenes de Fabricación</h3>
+      <p style="font-size: 12px; color: var(--muted); margin-bottom: 8px;">
+        Estados: <span class="status-dot status-calculando"></span>Calculando
+        <span class="status-dot status-confirmando"></span>Confirmando
+        <span class="status-dot status-confirmado"></span>Confirmado
+        <span class="status-dot status-consumiendo_piezas"></span>Consumiendo
+        <span class="status-dot status-esperando_fabricacion"></span>En Fábrica
+        <span class="status-dot status-completada"></span>Completada
+        <span class="status-dot status-fallida"></span>Fallida
+      </p>
       <table id="tbl-ordenes"></table>
     </div>
   </div>
 
   <script>
-    const host = document.getElementById("api-host").textContent.trim();
+    const hostLabel = document.getElementById("api-host");
+    const hostInput = document.getElementById("api-host-input");
+    const savedHost = localStorage.getItem("apiHost");
+    const defaultHost = savedHost || (window.location.origin.startsWith("http") ? window.location.origin : "http://localhost:5050");
+    let host = defaultHost.replace(/\/$/, "");
+    hostLabel.textContent = host;
+    hostInput.value = host;
+
     const logEl = document.getElementById("log");
 
     function log(msg) {
       logEl.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n` + logEl.textContent;
+    }
+
+    function setHost() {
+      const raw = hostInput.value.trim();
+      if (!raw) return;
+      host = raw.match(/^https?:\/\//) ? raw : `http://${raw}`;
+      host = host.replace(/\/$/, "");
+      hostLabel.textContent = host;
+      localStorage.setItem("apiHost", host);
+      log(`🌐 Host API actualizado a ${host}`);
+      refresh();
+      verificarServicioExterno();
     }
 
     async function getJson(url, opts = {}) {
@@ -140,58 +233,194 @@
     }
     function renderOrdenes(items) {
       const t = document.getElementById("tbl-ordenes");
-      t.innerHTML = "<tr><th>ID</th><th>Prod</th><th>Cant</th><th>Estado</th><th>Tiempo</th></tr>" +
+      const estadoLabels = {
+        'pending': 'Pendiente',
+        'pendiente': 'Pendiente',
+        'calculando': '🔢 Calculando',
+        'confirmando': '📤 Confirmando',
+        'confirmado': '✅ Confirmado',
+        'confirmacion_fallida': '⚠️ Conf. Fallida',
+        'consumiendo_piezas': '⚙️ Consumiendo',
+        'en_proceso': 'En Proceso',
+        'esperando_fabricacion': '🏭 En Fábrica',
+        'completada': 'Completada',
+        'fallida': 'Fallida'
+      };
+
+      t.innerHTML = "<tr><th>ID</th><th>Prod</th><th>Cant</th><th>Progreso</th><th>Estado</th><th>Tiempo</th><th>Detalles</th></tr>" +
         items.map(o => {
-          const tiempo = o.tiempo_estimado ?? (o.detalle ? o.detalle.tiempo_total : "");
-          return `<tr><td>${o.id}</td><td>${o.id_producto}</td><td>${o.cantidad}</td><td>${o.estado}</td><td>${tiempo}</td></tr>`;
+          const tiempo = o.tiempo_estimado ?? (o.detalle?.tiempo_total || "");
+          const estadoKey = o.estado.toLowerCase().replace(' ', '_');
+          const estadoLabel = estadoLabels[estadoKey] || o.estado;
+          const dotClass = `status-${estadoKey}`;
+          const fabricacionExterna = o.detalle?.fabricacion_externa ? '🏭' : '';
+          const mensaje = o.detalle?.mensaje || '';
+
+          // Mostrar progreso de entregas parciales
+          let progreso = '-';
+          if (o.detalle?.entrega_acumulada !== undefined) {
+            const acumulado = o.detalle.entrega_acumulada;
+            const total = o.cantidad;
+            const porcentaje = Math.round((acumulado / total) * 100);
+            const color = porcentaje >= 100 ? '#10b981' : '#f59e0b';
+            progreso = `<span style="color: ${color}; font-weight: 600;">${acumulado}/${total}</span> <small style="color: var(--muted);">(${porcentaje}%)</small>`;
+          }
+
+          // Mostrar últimos pasos si existen
+          let pasosInfo = '';
+          if (o.detalle?.pasos && o.detalle.pasos.length > 0) {
+            const ultimoPaso = o.detalle.pasos[o.detalle.pasos.length - 1];
+            pasosInfo = `<small style="color: var(--muted);">${ultimoPaso.substring(0, 40)}</small>`;
+          } else if (mensaje) {
+            pasosInfo = `<small style="color: var(--muted);">${mensaje.substring(0, 40)}</small>`;
+          }
+
+          return `<tr>
+            <td>${o.id}</td>
+            <td>${o.id_producto}</td>
+            <td>${o.cantidad}</td>
+            <td>${progreso}</td>
+            <td><span class="status-dot ${dotClass}"></span>${estadoLabel}</td>
+            <td>${tiempo}min</td>
+            <td>${fabricacionExterna} ${pasosInfo}</td>
+          </tr>`;
         }).join("");
     }
 
     async function encolarSolicitudesDesdePlan(codigo, cantidad) {
+      log(`🔄 GET ${host}/api/fabricacion/plan/${codigo}?cantidad=${cantidad}`);
       const plan = await getJson(`${host}/api/fabricacion/plan/${codigo}?cantidad=${cantidad}`);
+      log(`   ⏱️ Tiempo: ${plan.tiempo_estimado}min | Materiales: ${plan.materiales.length}`);
+
       const solicitudes = [];
       for (const m of plan.materiales) {
         const faltante = Math.max(m.cantidad_requerida - m.cantidad_disponible, 0);
         if (faltante > 0) {
+          log(`🔄 POST ${host}/api/proveedores/solicitudes_async - Pieza ${m.id_pieza} x${faltante}`);
           const resp = await getJson(`${host}/api/proveedores/solicitudes_async`, {
             method: "POST",
             headers: {"Content-Type":"application/json"},
             body: JSON.stringify({id_pieza: m.id_pieza, cantidad: faltante})
           });
           solicitudes.push(resp.id);
-          log(`Solicitud piezas encolada: ${m.id_pieza} -> ${faltante} (id=${resp.id})`);
+          log(`   ✅ Solicitud #${resp.id} encolada (estado: ${resp.estado})`);
+        } else {
+          log(`   ℹ️ ${m.id_pieza}: stock suficiente (${m.cantidad_disponible} disponible)`);
         }
       }
       return solicitudes;
     }
 
     async function encolarOrden(codigo, cantidad) {
+      log(`🔄 POST ${host}/api/fabricacion/ordenes - ${codigo} x${cantidad}`);
       const resp = await getJson(`${host}/api/fabricacion/ordenes`, {
         method: "POST",
         headers: {"Content-Type":"application/json"},
         body: JSON.stringify({id_producto: codigo, cantidad})
       });
-      log(`Orden encolada: ${codigo} x${cantidad} (id=${resp.id})`);
+      const tiempo = resp.tiempo_estimado || (resp.detalle?.tiempo_total) || '-';
+
+      // Mostrar pasos detallados del proceso
+      if (resp.detalle?.pasos && resp.detalle.pasos.length > 0) {
+        log(`   📋 Orden #${resp.id} - Flujo de confirmación:`);
+        resp.detalle.pasos.forEach(paso => {
+          log(`      ${paso}`);
+        });
+      }
+
+      log(`   ✅ Orden #${resp.id} completada - Estado: ${resp.estado} | Tiempo: ${tiempo}min`);
+
+      // Indicar si fue confirmada con fábrica externa
+      if (resp.detalle?.confirmacion_fabrica) {
+        log(`   🏭 Confirmación fábrica externa: ${JSON.stringify(resp.detalle.confirmacion_fabrica)}`);
+      } else if (resp.detalle?.fabricacion_externa === false) {
+        log(`   ⚠️ Fábrica externa no disponible, usando fabricación local`);
+      }
+
       return resp.id;
     }
 
     async function simularOrdenes() {
       try {
-        log("Calculando faltantes y encolando solicitudes/ordenes para S1 y S2...");
-        const s1Sol = await encolarSolicitudesDesdePlan("S1", 1500);
-        const s2Sol = await encolarSolicitudesDesdePlan("S2", 1500);
-        const ordenS1 = await encolarOrden("S1", 1500);
-        const ordenS2 = await encolarOrden("S2", 1500);
-        log(`Solicitudes S1: ${s1Sol.join(",")} | Solicitudes S2: ${s2Sol.join(",")}`);
-        log(`Ordenes encoladas -> S1:${ordenS1}, S2:${ordenS2}`);
+        log("🚀 Simulación completa: Calculando faltantes y encolando S1 y S2...");
+        const qty1 = parseInt(document.getElementById("qty-s1").value);
+        const qty2 = parseInt(document.getElementById("qty-s2").value);
+        const s1Sol = await encolarSolicitudesDesdePlan("S1", qty1);
+        const s2Sol = await encolarSolicitudesDesdePlan("S2", qty2);
+        const ordenS1 = await encolarOrden("S1", qty1);
+        const ordenS2 = await encolarOrden("S2", qty2);
+        log(`✅ Solicitudes S1: [${s1Sol.join(",")}] | S2: [${s2Sol.join(",")}]`);
+        log(`✅ Órdenes encoladas -> S1: ${ordenS1}, S2: ${ordenS2}`);
         refresh();
       } catch (err) {
-        log(`Error en simulación: ${err.message}`);
+        log(`❌ Error en simulación: ${err.message}`);
       }
     }
 
-    setInterval(refresh, 3000);
+    async function encolarOrdenIndividual(codigo) {
+      try {
+        const qty = parseInt(document.getElementById(`qty-${codigo.toLowerCase()}`).value);
+        log(`📦 Encolando orden individual: ${codigo} x${qty}...`);
+        const solicitudes = await encolarSolicitudesDesdePlan(codigo, qty);
+        const ordenId = await encolarOrden(codigo, qty);
+        log(`✅ ${codigo}: Orden ${ordenId} encolada | Solicitudes: [${solicitudes.join(",")}]`);
+        refresh();
+      } catch (err) {
+        log(`❌ Error encolando ${codigo}: ${err.message}`);
+      }
+    }
+
+    async function verificarPlan(codigo) {
+      try {
+        const qty = parseInt(document.getElementById(`qty-${codigo.toLowerCase()}`).value);
+        log(`🔍 Consultando plan de fabricación para ${codigo} x${qty}...`);
+        const plan = await getJson(`${host}/api/fabricacion/plan/${codigo}?cantidad=${qty}`);
+        log(`📋 Plan ${codigo}:`);
+        log(`   Tiempo estimado: ${plan.tiempo_estimado} min`);
+        log(`   Materiales necesarios:`);
+        plan.materiales.forEach(m => {
+          const faltante = Math.max(m.cantidad_requerida - m.cantidad_disponible, 0);
+          const status = faltante > 0 ? "⚠️ FALTA" : "✅ OK";
+          log(`   - ${m.id_pieza}: ${m.cantidad_requerida} req, ${m.cantidad_disponible} disp, ${faltante} faltante ${status}`);
+        });
+        log(`   Fuente: ${plan.fuente_datos || 'Plan interno'}`);
+      } catch (err) {
+        log(`❌ Error consultando plan ${codigo}: ${err.message}`);
+      }
+    }
+
+    async function verificarServicioExterno() {
+      try {
+        const status = await getJson(`${host}/api/fabricacion/external/status`);
+
+        document.getElementById("ext-base").textContent = status.base_url || "Sin configurar";
+
+        if (status.conectado) {
+          document.getElementById("ext-status").innerHTML = '<span style="color: #10b981;">🟢 Conectado</span>';
+          document.getElementById("ext-s1").textContent = status.planos.S1?.disponible
+            ? `✅ T=${status.planos.S1.tiempo_fabricacion}min`
+            : "❌ N/A";
+          document.getElementById("ext-s2").textContent = status.planos.S2?.disponible
+            ? `✅ T=${status.planos.S2.tiempo_fabricacion}min`
+            : "❌ N/A";
+          log(`🔗 Servicio externo OK: S1=${status.planos.S1?.disponible ? 'OK' : 'NO'}, S2=${status.planos.S2?.disponible ? 'OK' : 'NO'}`);
+        } else {
+          document.getElementById("ext-status").innerHTML = '<span style="color: #f59e0b;">🟡 No disponible</span>';
+          document.getElementById("ext-s1").textContent = "⚠️ Fallback";
+          document.getElementById("ext-s2").textContent = "⚠️ Fallback";
+          log(`⚠️ Servicio externo no responde, usando planes internos`);
+        }
+      } catch (err) {
+        document.getElementById("ext-status").innerHTML = '<span style="color: #ef4444;">🔴 Error</span>';
+        document.getElementById("ext-base").textContent = "Error";
+        log(`❌ Error verificando servicio externo: ${err.message}`);
+      }
+    }
+
+    setInterval(refresh, 8000);  // Reducido de 3s a 8s para evitar concurrencia
+    setInterval(verificarServicioExterno, 15000);  // Reducido frecuencia
     refresh();
+    verificarServicioExterno();
   </script>
 </body>
 </html>
