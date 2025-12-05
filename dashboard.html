@@ -539,9 +539,9 @@
         const qty = parseInt(document.getElementById(`qty-${codigo.toLowerCase()}`).value);
         log(`🔍 Consultando plan de fabricación para ${codigo} x${qty}...`);
         const plan = await getJson(`${host}/api/fabricacion/plan/${codigo}?cantidad=${qty}`);
-        log(`📋 Plan ${codigo}:`, "inv");
-        log(`   Tiempo estimado: ${plan.tiempo_estimado} min`, "inv");
-        log(`   Materiales necesarios:`, "inv");
+      log(`📋 Plan ${codigo}: fuente=${plan.fuente_datos || 'desconocida'}`, "inv");
+      log(`   Tiempo estimado: ${plan.tiempo_estimado} min`, "inv");
+      log(`   Materiales necesarios:`, "inv");
         plan.materiales.forEach(m => {
           const faltante = Math.max(m.cantidad_requerida - m.cantidad_disponible, 0);
           const status = faltante > 0 ? "⚠️ FALTA" : "✅ OK";
@@ -553,7 +553,10 @@
       }
     }
 
+    let externalCheckInFlight = false;
     async function verificarServicioExterno() {
+      if (externalCheckInFlight) return;
+      externalCheckInFlight = true;
       try {
         const status = await getJson(`${host}/api/fabricacion/external/status`);
 
@@ -579,13 +582,15 @@
         document.getElementById("ext-status").innerHTML = '<span style="color: #ef4444;">🔴 Error</span>';
         document.getElementById("ext-base").textContent = "Error";
         log(`❌ Error verificando servicio externo: ${err.message}`);
+      } finally {
+        externalCheckInFlight = false;
       }
     }
 
     setInterval(refresh, 8000);  // Reducido de 3s a 8s para evitar concurrencia
-    setInterval(verificarServicioExterno, 15000);  // Reducido frecuencia
+    // Para no spamear el servicio externo, quitamos el polling automático (solo manual o carga inicial)
     refresh();
-    verificarServicioExterno();
+    verificarServicioExterno();  // una sola verificación inicial; el botón "Probar" repite la llamada
   </script>
 </body>
 </html>

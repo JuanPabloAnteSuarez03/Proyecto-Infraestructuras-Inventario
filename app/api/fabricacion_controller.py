@@ -50,6 +50,7 @@ def obtener_plan(
         "cantidad_solicitada": cantidad,
         "materiales": materiales,
         "tiempo_estimado": plan.tiempo_produccion,
+        "fuente_datos": getattr(plan, "fuente_datos", "interno"),
     }
 
 
