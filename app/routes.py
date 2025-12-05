@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from .controllers import (
+from .api import (
     inventario_productos_router,
     inventario_piezas_router,
     proveedores_router,

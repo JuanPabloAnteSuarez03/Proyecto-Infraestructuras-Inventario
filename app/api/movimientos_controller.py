@@ -1,21 +1,27 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from marshmallow import ValidationError
-from ..schemas.inventory import MovimientoSchema
 from ..schemas.api_models import MovimientoCreate, MovimientoUpdate
 from ..database import get_db
-from ..services.movimientos_service import MovimientosService
+from ..services import MovimientosService
 
 router = APIRouter(prefix="/api/movimientos", tags=["movimientos"])
-movimiento_schema = MovimientoSchema()
-movimientos_schema = MovimientoSchema(many=True)
+
+
+def serialize_movimiento(m):
+    return {
+        "id_movimiento": m.id_movimiento,
+        "id_objeto": m.id_objeto,
+        "tipo_objeto": m.tipo_objeto,
+        "cantidad": m.cantidad,
+        "direccion": m.direccion,
+    }
 
 
 @router.get("")
 def listar_movimientos(db: Session = Depends(get_db)):
     service = MovimientosService(db)
     movimientos = service.list()
-    return movimientos_schema.dump(movimientos)
+    return [serialize_movimiento(m) for m in movimientos]
 
 
 @router.get("/{movimiento_id}")
@@ -24,19 +30,15 @@ def obtener_movimiento(movimiento_id: int, db: Session = Depends(get_db)):
     movimiento = service.retrieve(movimiento_id)
     if not movimiento:
         raise HTTPException(status_code=404, detail="Movimiento no encontrado")
-    return movimiento_schema.dump(movimiento)
+    return serialize_movimiento(movimiento)
 
 
 @router.post("", status_code=201)
 def crear_movimiento(body: MovimientoCreate, db: Session = Depends(get_db)):
     service = MovimientosService(db)
     payload = body.model_dump()
-    try:
-        data = movimiento_schema.load(payload)
-    except ValidationError as exc:
-        raise HTTPException(status_code=400, detail=exc.messages)
-    movimiento = service.create(data)
-    return movimiento_schema.dump(movimiento)
+    movimiento = service.create(payload)
+    return serialize_movimiento(movimiento)
 
 
 @router.delete("/{movimiento_id}")
@@ -54,12 +56,8 @@ def actualizar_movimiento(
 ):
     service = MovimientosService(db)
     payload = body.model_dump(exclude_unset=True)
-    try:
-        data = movimiento_schema.load(payload, partial=True)
-    except ValidationError as exc:
-        raise HTTPException(status_code=400, detail=exc.messages)
-    data.pop("id_movimiento", None)
-    movimiento = service.update(movimiento_id, data)
+    payload.pop("id_movimiento", None)
+    movimiento = service.update(movimiento_id, payload)
     if not movimiento:
         raise HTTPException(status_code=404, detail="Movimiento no encontrado")
-    return movimiento_schema.dump(movimiento)
+    return serialize_movimiento(movimiento)

@@ -140,3 +140,7 @@ dmypy.json
 
 # Claude Code
 .claude/settings.local.json
+
+# External repos (duplicates)
+external/fabricacion-api/
+external/*.zip

@@ -1,5 +1,5 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
-from marshmallow import ValidationError
 import httpx
 import os
 from sqlalchemy.orm import Session
@@ -8,17 +8,17 @@ from ..services import (
     InventarioProductosService,
     OrdenesFabricacionService,
     ProveedoresService,
+    EntregasFabricacionService,
+    FabricacionOrchestrator,
 )
+from ..models.entities import OrdenFabricacion
 from ..repositories import InventarioPiezasRepository
-from ..schemas.inventory import SolicitudFabricacionSchema, SolicitudCalculoPiezasSchema
 from ..schemas.api_models import SolicitudFabricacion, CalculoPiezas, OrdenFabricacionAsync
-from ..tasks import queue, procesar_orden_fabricacion
 from ..database import get_db
 
 router = APIRouter(prefix="/api/fabricacion", tags=["fabricacion"])
-solicitud_schema = SolicitudFabricacionSchema()
-calculo_schema = SolicitudCalculoPiezasSchema()
 fabricacion_service = FabricacionService()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/plan/{codigo}")
@@ -56,11 +56,9 @@ def obtener_plan(
 @router.post("/calcular_piezas")
 def calcular_piezas(body: CalculoPiezas):
     payload = body.model_dump()
-    try:
-        data = calculo_schema.load(payload)
-    except ValidationError as exc:
-        raise HTTPException(status_code=400, detail=exc.messages)
-    codigo = data["codigo"].upper()
+    if payload["cantidad"] <= 0:
+        raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a cero")
+    codigo = payload["codigo"].upper()
     try:
         base_plan = fabricacion_service.obtener_plan_base(codigo)
     except ValueError as exc:
@@ -72,13 +70,13 @@ def calcular_piezas(body: CalculoPiezas):
             {
                 "codigo": pieza["id_pieza"],
                 "cantidad_por_unidad": pieza["cantidad"],
-                "cantidad_total": pieza["cantidad"] * data["cantidad"],
+                "cantidad_total": pieza["cantidad"] * payload["cantidad"],
             }
         )
 
     return {
         "codigo": codigo,
-        "cantidad_solicitada": data["cantidad"],
+        "cantidad_solicitada": payload["cantidad"],
         "piezas": piezas,
     }
 
@@ -86,14 +84,12 @@ def calcular_piezas(body: CalculoPiezas):
 @router.post("/producciones")
 def producir_lote(body: SolicitudFabricacion, session: Session = Depends(get_db)):
     payload = body.model_dump()
-    try:
-        data = solicitud_schema.load(payload)
-    except ValidationError as exc:
-        raise HTTPException(status_code=400, detail=exc.messages)
+    if payload["cantidad"] <= 0:
+        raise HTTPException(status_code=400, detail="La cantidad debe ser mayor a cero")
     try:
         productos_service = InventarioProductosService(session)
         resultado = productos_service.fabricar_productos(
-            producto_id=data["id_producto"], cantidad=data["cantidad"]
+            producto_id=payload["id_producto"], cantidad=payload["cantidad"]
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -104,107 +100,15 @@ def producir_lote(body: SolicitudFabricacion, session: Session = Depends(get_db)
 def crear_orden_fabricacion(
     body: OrdenFabricacionAsync, session: Session = Depends(get_db)
 ):
-    """
-    Crea orden de fabricación con confirmación sincrónica a fábrica externa.
-
-    Flujo:
-    1. Calcular piezas necesarias
-    2. Verificar disponibilidad en inventario
-    3. Solicitar piezas faltantes a proveedores si necesario
-    4. Confirmar fabricación con fábrica externa
-    5. Encolar worker para consumir piezas y esperar webhook
-    """
     payload = body.model_dump()
     codigo = payload["id_producto"].upper()
     cantidad = payload["cantidad"]
 
-    ordenes_service = OrdenesFabricacionService(session)
-    piezas_repo = InventarioPiezasRepository(session)
-    proveedores_service = ProveedoresService(session, piezas_repository=piezas_repo)
-
-    orden = ordenes_service.create(
-        {"id_producto": codigo, "cantidad": cantidad, "estado": "calculando"}
-    )
-
-    detalle: dict[str, list | dict | str] = {"pasos": []}
-
+    orchestrator = FabricacionOrchestrator(session, fabricacion_service=fabricacion_service)
     try:
-        detalle["pasos"].append("Calculando piezas necesarias...")
-        plan = fabricacion_service.solicitar_plan(codigo, cantidad)
-        detalle["plan"] = {
-            "materiales": plan.materiales,
-            "tiempo_produccion": plan.tiempo_produccion,
-        }
-        detalle["pasos"].append(f"Se necesitan {len(plan.materiales)} tipos de piezas")
-
-        detalle["pasos"].append("Verificando inventario de piezas...")
-        tiempo_reabastecimiento = 0
-
-        for material in plan.materiales:
-            pieza = piezas_repo.get_by_id(material["id_pieza"])
-            disponible = pieza.cantidad if pieza else 0
-            necesario = material["cantidad"]
-
-            if disponible < necesario:
-                faltante = necesario - disponible
-                detalle["pasos"].append(
-                    f"Pieza {material['id_pieza']}: faltan {faltante} unidades"
-                )
-
-                resultado_proveedor = proveedores_service.solicitar_piezas(
-                    material["id_pieza"], faltante
-                )
-                tiempo_reabastecimiento = max(
-                    tiempo_reabastecimiento, resultado_proveedor["tiempo_entrega"]
-                )
-                detalle["pasos"].append(
-                    f"Solicitado a proveedor: {faltante} x {material['id_pieza']}"
-                )
-
-        session.commit()
-
-        detalle["pasos"].append("Enviando confirmación a fábrica externa...")
-        orden.estado = "confirmando"
-        session.commit()
-
-        confirmacion = fabricacion_service.confirmar_fabricacion_externa(
-            codigo, cantidad
-        )
-
-        if confirmacion and confirmacion.get("status") == "ok":
-            orden.estado = "confirmado"
-            detalle["pasos"].append("✓ Fábrica externa confirmó la orden")
-            detalle["confirmacion_fabrica"] = confirmacion
-            detalle["fabricacion_externa"] = True
-
-            queue.enqueue(procesar_orden_fabricacion, orden.id)
-            detalle["pasos"].append(
-                "Worker encolado para consumir piezas y esperar productos"
-            )
-        else:
-            orden.estado = "confirmacion_fallida"
-            detalle["pasos"].append("✗ Fábrica externa no disponible")
-            detalle["pasos"].append(
-                "No se permite fabricación local - orden marcada como fallida"
-            )
-            detalle["fabricacion_externa"] = False
-            queue.enqueue(procesar_orden_fabricacion, orden.id)
-
-        orden.tiempo_estimado = tiempo_reabastecimiento + plan.tiempo_produccion
-        orden.detalle = detalle
-        session.commit()
-
-        return {
-            "id": orden.id,
-            "estado": orden.estado,
-            "tiempo_estimado": orden.tiempo_estimado,
-            "detalle": detalle,
-        }
-
+        resultado = orchestrator.crear_orden(codigo, cantidad)
+        return resultado
     except Exception as exc:  # pylint: disable=broad-except
-        orden.estado = "fallida"
-        orden.detalle = {"error": str(exc), "pasos": detalle.get("pasos", [])}
-        session.commit()
         raise HTTPException(status_code=500, detail=str(exc))
 
 
@@ -241,10 +145,17 @@ def listar_ordenes_fabricacion(session: Session = Depends(get_db)):
     ]
 
 
+@router.post("/ordenes/reset")
+def resetear_ordenes(session: Session = Depends(get_db)):
+    ordenes_service = OrdenesFabricacionService(session)
+    total = ordenes_service.delete_all()
+    return {"message": "Órdenes de fabricación reseteadas", "registros": total}
+
+
 @router.get("/external/status")
 def verificar_servicio_externo():
     """Proxy endpoint para verificar el estado del servicio externo de fabricación"""
-    base_url = os.getenv("FABRICA_BASE_URL", "").rstrip("/")
+    base_url = FabricacionService.get_base_url()
     if not base_url:
         return {"conectado": False, "planos": {}}
 
@@ -269,6 +180,21 @@ def verificar_servicio_externo():
         "base_url": base_url,
         "planos": planos,
     }
+
+
+@router.get("/external/config")
+def obtener_config_externa():
+    """Ver configuración actual de fábrica externa."""
+    base_url = FabricacionService.get_base_url()
+    return {"base_url": base_url}
+
+
+@router.post("/external/config")
+def actualizar_config_externa(payload: dict):
+    """Actualizar base_url de fábrica externa en caliente."""
+    nueva_url = (payload or {}).get("base_url", "")
+    FabricacionService.set_base_url(nueva_url)
+    return {"message": "Base URL de fábrica actualizada", "base_url": FabricacionService.get_base_url()}
 
 
 @router.get("/external/planos/{plano_id}")
@@ -309,61 +235,45 @@ async def recibir_productos_fabricados(
     try:
         body = await request.json()
     except Exception as exc:  # pylint: disable=broad-except
-        print(f"[WEBHOOK] Error parseando JSON: {exc}")
+        logger.error("[WEBHOOK] Error parseando JSON: %s", exc)
         raise HTTPException(status_code=400, detail=f"JSON inválido: {str(exc)}")
 
-    print(f"[WEBHOOK] Recibido: {body}")
+    logger.info("[WEBHOOK] Recibido: %s", body)
 
-    codigo = body.get("codigo")
+    # Aceptar tanto "codigo" como "id_producto" y mapear alias numéricos
+    raw_codigo = body.get("codigo") or body.get("id_producto")
     cantidad = body.get("cantidad")
     estado = body.get("estado", "Disponible")
 
-    if not codigo or not cantidad:
+    if not raw_codigo or not cantidad:
         raise HTTPException(
             status_code=400, detail="Se requieren 'codigo' y 'cantidad'"
         )
 
+    codigo_alias = {"1": "S1", "2": "S2"}
+    codigo = codigo_alias.get(str(raw_codigo).strip(), str(raw_codigo)).upper()
+
     try:
         productos_service = InventarioProductosService(session)
-        ordenes_service = OrdenesFabricacionService(session)
-
         producto = productos_service.incrementar(
             producto_id=codigo, cantidad=cantidad, estado=estado
         )
 
-        # Cerrar órdenes esperando fabricación para este producto.
-        ordenes_pendientes = ordenes_service.list()
-        for orden in ordenes_pendientes:
-            if (
-                orden.id_producto == codigo.upper()
-                and orden.estado == "esperando_fabricacion"
-            ):
-                # Si la fábrica envía más de lo pedido, también se completa.
-                if cantidad >= orden.cantidad:
-                    orden.estado = "completada"
-                    session.commit()
-                    print(
-                        f"[WEBHOOK] ✓ Orden #{orden.id} completada. "
-                        f"Pedido: {orden.cantidad}, recibido: {cantidad}"
-                    )
-                    break
-                else:
-                    # Entrega parcial: marcar detalle y esperar siguiente webhook
-                    if isinstance(orden.detalle, dict):
-                        orden.detalle["entrega_parcial"] = cantidad
-                    else:
-                        orden.detalle = {"entrega_parcial": cantidad}
-                    session.commit()
-                    print(
-                        f"[WEBHOOK] ⚠️ Entrega parcial para orden #{orden.id}: "
-                        f"recibido {cantidad} de {orden.cantidad}"
-                    )
-                    break
+        entregas = EntregasFabricacionService(session).registrar_entrega(
+            codigo=codigo,
+            cantidad=cantidad,
+            estados_objetivo=("esperando_fabricacion",),
+        )
 
         return {
             "status": "ok",
             "mensaje": f"Recibidos {cantidad} productos {codigo}",
             "inventario_actual": producto.cantidad,
+            "entrega": {
+                "orden_id": entregas["orden"].id if entregas else None,
+                "acumulado": entregas["acumulado"] if entregas else cantidad,
+                "completada": bool(entregas and entregas["completada"]),
+            },
         }
     except Exception as exc:  # pylint: disable=broad-except
         raise HTTPException(

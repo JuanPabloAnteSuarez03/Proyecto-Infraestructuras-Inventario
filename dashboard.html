@@ -4,32 +4,36 @@
   <meta charset="UTF-8">
   <title>Dashboard Inventario + Fabricación</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
     :root {
-      --bg: #0b0f17;
-      --panel: #111827;
-      --accent: #10b981;
+      --bg: radial-gradient(120% 120% at 10% 10%, #0f172a 0%, #0b1020 35%, #070a12 70%);
+      --panel: #0f172a;
+      --panel-2: #111827;
+      --accent: #22d3ee;
+      --accent-strong: #06b6d4;
       --text: #e5e7eb;
       --muted: #9ca3af;
       --border: #1f2937;
       --warn: #f59e0b;
+      --shadow: 0 20px 45px rgba(0,0,0,0.35);
     }
     * { box-sizing: border-box; }
-    body { font-family: "Inter", Arial, sans-serif; margin: 16px; background: var(--bg); color: var(--text); }
-    h1 { margin: 0 0 4px 0; }
+    body { font-family: "Space Grotesk", "Inter", Arial, sans-serif; margin: 0; background: var(--bg); color: var(--text); padding: 18px; }
+    h1 { margin: 0 0 6px 0; letter-spacing: -0.5px; }
     p { margin: 0 0 8px 0; color: var(--muted); }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; }
-    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px; box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
-    button { background: var(--accent); color: #000; border: none; padding: 10px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; }
-    button:hover { filter: brightness(1.05); }
+    .card { background: linear-gradient(160deg, var(--panel) 0%, var(--panel-2) 100%); border: 1px solid var(--border); border-radius: 12px; padding: 16px; box-shadow: var(--shadow); }
+    button { background: var(--accent); color: #051020; border: none; padding: 10px 14px; border-radius: 10px; cursor: pointer; font-weight: 600; transition: transform 120ms ease, box-shadow 120ms ease; }
+    button:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(34, 211, 238, 0.2); }
     button:disabled { background: #4b5563; color: #cbd5e1; cursor: not-allowed; }
     input { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; }
-    pre { background: #0f172a; color: #93c5fd; padding: 10px; border-radius: 8px; max-height: 260px; overflow: auto; font-size: 13px; }
+    pre { background: #0c1425; color: #93c5fd; padding: 10px; border-radius: 10px; max-height: 260px; overflow: auto; font-size: 13px; border: 1px solid var(--border); box-shadow: var(--shadow); }
     .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .badge { padding: 4px 8px; border-radius: 6px; background: #1f2937; color: var(--muted); font-size: 12px; }
+    .badge { padding: 4px 8px; border-radius: 999px; background: #122038; color: var(--muted); font-size: 12px; border: 1px solid var(--border); }
     .kpi { display: flex; gap: 12px; flex-wrap: wrap; }
-    .kpi .item { background: #111827; border: 1px solid var(--border); padding: 10px; border-radius: 8px; min-width: 140px; }
-    .kpi .item .label { color: var(--muted); font-size: 12px; }
-    .kpi .item .value { font-size: 18px; font-weight: 700; color: var(--text); }
+    .kpi .item { background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 12px; border-radius: 12px; min-width: 140px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.04); }
+    .kpi .item .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; }
+    .kpi .item .value { font-size: 20px; font-weight: 700; color: var(--text); }
     .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 6px; }
     .status-pending { background: #6b7280; }
     .status-pendiente { background: #6b7280; }
@@ -47,28 +51,60 @@
       50% { opacity: 0.5; }
     }
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { padding: 8px; border-bottom: 1px solid var(--border); }
-    th { text-align: left; color: var(--muted); font-weight: 600; }
-    tr:hover { background: #0f172a; }
+    th, td { padding: 10px 8px; border-bottom: 1px solid var(--border); }
+    th { text-align: left; color: var(--muted); font-weight: 700; letter-spacing: 0.01em; text-transform: uppercase; font-size: 12px; }
+    tr:hover { background: rgba(255,255,255,0.03); }
+    header.hero { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; margin-bottom: 12px; background: linear-gradient(120deg, rgba(34,211,238,0.12), rgba(16,185,129,0.08)); border: 1px solid var(--border); border-radius: 14px; box-shadow: var(--shadow); }
+    .pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; background: #0e1a2d; color: var(--muted); border: 1px solid var(--border); font-size: 12px; }
+    .section-title { font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 8px 0; }
+    .action-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; width: 100%; }
+    .action-grid button { width: 100%; justify-content: center; }
   </style>
 </head>
 <body>
-  <div class="row" style="justify-content: space-between; align-items: flex-end; gap: 14px; margin-bottom: 6px;">
+  <header class="hero">
     <div>
-      <h1>Dashboard Inventario + Fabricación (Simulación)</h1>
+      <div class="pill">Inventarios + Fábrica en vivo</div>
+      <h1>Dashboard Inventario + Fabricación</h1>
       <p>Host API: <code id="api-host"></code></p>
     </div>
     <div class="row">
       <input id="api-host-input" type="text" placeholder="http://localhost:5050" style="min-width: 220px;">
       <button onclick="setHost()">Actualizar host</button>
-      <button onclick="refresh()" style="background: #3b82f6;">Refrescar datos</button>
+      <button onclick="refresh()" style="background: #3b82f6; color: #e5e7eb;">Refrescar datos</button>
     </div>
-  </div>
+  </header>
 
   <div class="grid">
     <div class="card">
+      <h3>Administración rápida</h3>
+      <div class="section-title">Crear producto</div>
+      <div class="row">
+        <input id="new-prod-id" placeholder="Código (S1/S2)" style="width: 120px;">
+        <input id="new-prod-estado" placeholder="Estado (Disponible)" value="Disponible" style="width: 140px;">
+        <input id="new-prod-cant" type="number" placeholder="Cantidad" value="0" style="width: 100px;">
+        <button onclick="crearProducto()">Crear</button>
+      </div>
+      <div class="section-title" style="margin-top:10px;">Crear pieza</div>
+      <div class="row">
+        <input id="new-pieza-id" placeholder="Pieza (P1...)" style="width: 120px;">
+        <input id="new-pieza-cant" type="number" placeholder="Cantidad" value="0" style="width: 100px;">
+        <input id="new-pieza-prov" type="number" placeholder="Proveedor ID" value="1" style="width: 120px;">
+        <button onclick="crearPieza()">Crear</button>
+      </div>
+      <div class="section-title" style="margin-top:10px;">Resetear datos</div>
+      <div class="row" style="gap:8px; flex-wrap: wrap;">
+        <div class="action-grid">
+          <button onclick="resetProductos()" style="background:#ef4444;color:#fff;">Reset productos</button>
+          <button onclick="resetPiezas()" style="background:#f97316;color:#fff;">Reset piezas</button>
+          <button onclick="resetSolicitudes()" style="background:#6366f1;color:#fff;">Reset solicitudes piezas</button>
+          <button onclick="resetOrdenes()" style="background:#0ea5e9;color:#fff;">Reset órdenes fabricación</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
       <h3>Monitor Servicio Externo de Fabricación</h3>
-      <div class="kpi">
+      <div class="kpi" style="margin-bottom:6px;">
         <div class="item">
           <div class="label">Estado Conexión</div>
           <div class="value" id="ext-status">Verificando...</div>
@@ -81,6 +117,12 @@
           <div class="label">Plano S2</div>
           <div class="value" id="ext-s2">-</div>
         </div>
+      </div>
+      <div class="section-title">Base URL de Fábrica</div>
+      <div class="row" style="gap:8px; flex-wrap: wrap;">
+        <input id="ext-url-input" type="text" placeholder="http://fabricacion_api:8000" style="min-width: 240px;">
+        <button onclick="actualizarFabrica()" style="background:#22c55e;">Guardar</button>
+        <button onclick="verificarServicioExterno()" style="background:#3b82f6;">Probar</button>
       </div>
       <p style="font-size: 12px; margin-top: 8px;">🔗 <code id="ext-base">Sin configurar</code></p>
     </div>
@@ -114,18 +156,33 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card" style="display: flex; flex-direction: column; gap: 8px;">
       <h3>Logs de Integración</h3>
-      <pre id="log"></pre>
+      <div class="action-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+        <button onclick="setFilter('all')" id="btn-filter-all" style="background:#0ea5e9;color:#e5e7eb;">Todo</button>
+        <button onclick="setFilter('send')" id="btn-filter-send" style="background:#22c55e;">Enviados → Fábrica/Prov</button>
+        <button onclick="setFilter('recv')" id="btn-filter-recv" style="background:#f97316;">Recibidos ← Fábrica</button>
+        <button onclick="setFilter('inv')" id="btn-filter-inv" style="background:#a855f7;">Inventario/Stock</button>
+        <button onclick="clearLogs()" style="background:#64748b;color:#e5e7eb;">Limpiar</button>
+      </div>
+      <pre id="log" style="min-height:220px;"></pre>
     </div>
 
     <div class="card">
       <h3>KPIs Inventario</h3>
+      <div style="margin-bottom:6px;" class="section-title">Inventario de Productos</div>
       <div class="kpi">
         <div class="item"><div class="label">Prod S1 Disponible</div><div class="value" id="kpi-s1"></div></div>
         <div class="item"><div class="label">Prod S2 Disponible</div><div class="value" id="kpi-s2"></div></div>
-        <div class="item"><div class="label">Piezas P1</div><div class="value" id="kpi-p1"></div></div>
-        <div class="item"><div class="label">Piezas P2</div><div class="value" id="kpi-p2"></div></div>
+      </div>
+      <div style="margin:10px 0 6px 0;" class="section-title">Inventario de Piezas</div>
+      <div class="kpi">
+        <div class="item"><div class="label">P1</div><div class="value" id="kpi-p1"></div></div>
+        <div class="item"><div class="label">P2</div><div class="value" id="kpi-p2"></div></div>
+        <div class="item"><div class="label">P3</div><div class="value" id="kpi-p3"></div></div>
+        <div class="item"><div class="label">P4</div><div class="value" id="kpi-p4"></div></div>
+        <div class="item"><div class="label">P5</div><div class="value" id="kpi-p5"></div></div>
+        <div class="item"><div class="label">P6</div><div class="value" id="kpi-p6"></div></div>
       </div>
     </div>
 
@@ -143,15 +200,6 @@
     </div>
     <div class="card">
       <h3>Órdenes de Fabricación</h3>
-      <p style="font-size: 12px; color: var(--muted); margin-bottom: 8px;">
-        Estados: <span class="status-dot status-calculando"></span>Calculando
-        <span class="status-dot status-confirmando"></span>Confirmando
-        <span class="status-dot status-confirmado"></span>Confirmado
-        <span class="status-dot status-consumiendo_piezas"></span>Consumiendo
-        <span class="status-dot status-esperando_fabricacion"></span>En Fábrica
-        <span class="status-dot status-completada"></span>Completada
-        <span class="status-dot status-fallida"></span>Fallida
-      </p>
       <table id="tbl-ordenes"></table>
     </div>
   </div>
@@ -167,8 +215,37 @@
 
     const logEl = document.getElementById("log");
 
-    function log(msg) {
-      logEl.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n` + logEl.textContent;
+    const logBuffer = [];
+    let logFilter = "all";
+
+    function setFilter(f) {
+      logFilter = f;
+      ["all","send","recv","inv"].forEach(key => {
+        const btn = document.getElementById(`btn-filter-${key}`);
+        if (btn) btn.style.filter = key === f ? "brightness(1.15)" : "none";
+      });
+      renderLogs();
+    }
+
+    function clearLogs() {
+      logBuffer.length = 0;
+      logEl.textContent = "";
+    }
+
+    function renderLogs() {
+      const filtered = logBuffer.filter(item => logFilter === "all" || item.kind === logFilter);
+      logEl.textContent = filtered.map(item => item.text).join("\n");
+    }
+
+    function pushLog(kind, msg) {
+      const line = `[${new Date().toLocaleTimeString()}] ${msg}`;
+      logBuffer.unshift({kind, text: line});
+      if (logBuffer.length > 400) logBuffer.pop();
+      renderLogs();
+    }
+
+    function log(msg, kind = "all") {
+      pushLog(kind, msg);
     }
 
     function setHost() {
@@ -181,6 +258,104 @@
       log(`🌐 Host API actualizado a ${host}`);
       refresh();
       verificarServicioExterno();
+    }
+
+    async function actualizarFabrica() {
+      const base = document.getElementById("ext-url-input").value.trim();
+      try {
+        log(`📝 Actualizando fábrica externa a ${base || '(vacío)'}`, "send");
+        await getJson(`${host}/api/fabricacion/external/config`, {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({base_url: base}),
+        });
+        log("✅ Base de fábrica actualizada", "inv");
+        verificarServicioExterno();
+      } catch (err) {
+        log(`❌ Error actualizando fábrica: ${err.message}`, "inv");
+      }
+    }
+
+    async function crearProducto() {
+      const id = document.getElementById("new-prod-id").value.trim();
+      const estado = document.getElementById("new-prod-estado").value.trim() || "Disponible";
+      const cant = parseInt(document.getElementById("new-prod-cant").value) || 0;
+      if (!id) return log("⚠️ Ingresa un código de producto", "inv");
+      try {
+        log(`➕ Creando producto ${id}/${estado} x${cant}`, "send");
+        await getJson(`${host}/api/productos`, {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({id_producto: id, estado, cantidad: cant}),
+        });
+        log(`✅ Producto ${id}/${estado} creado`, "inv");
+        refresh();
+      } catch (err) {
+        log(`❌ Error creando producto: ${err.message}`, "inv");
+      }
+    }
+
+    async function crearPieza() {
+      const id = document.getElementById("new-pieza-id").value.trim();
+      const cant = parseInt(document.getElementById("new-pieza-cant").value) || 0;
+      const prov = parseInt(document.getElementById("new-pieza-prov").value) || 1;
+      if (!id) return log("⚠️ Ingresa un código de pieza", "inv");
+      try {
+        log(`➕ Creando pieza ${id} x${cant} (prov ${prov})`, "send");
+        await getJson(`${host}/api/piezas`, {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({id_pieza: id, cantidad: cant, id_proveedor: prov}),
+        });
+        log(`✅ Pieza ${id} creada`, "inv");
+        refresh();
+      } catch (err) {
+        log(`❌ Error creando pieza: ${err.message}`, "inv");
+      }
+    }
+
+    async function resetProductos() {
+      try {
+        log("♻️ Reseteando inventario de productos...", "send");
+        await getJson(`${host}/api/productos/reset`, {method: "POST"});
+        log("✅ Productos reseteados", "inv");
+        refresh();
+      } catch (err) {
+        log(`❌ Error reseteando productos: ${err.message}`, "inv");
+      }
+    }
+
+    async function resetPiezas() {
+      try {
+        log("♻️ Reseteando inventario de piezas...", "send");
+        await getJson(`${host}/api/piezas/reset`, {method: "POST"});
+        log("✅ Piezas reseteadas", "inv");
+        refresh();
+      } catch (err) {
+        log(`❌ Error reseteando piezas: ${err.message}`, "inv");
+      }
+    }
+
+    async function resetSolicitudes() {
+      try {
+        log("♻️ Reseteando solicitudes async...", "send");
+        await getJson(`${host}/api/proveedores/solicitudes_async/reset`, {method: "POST"});
+        log("✅ Solicitudes async reseteadas", "inv");
+        refresh();
+      } catch (err) {
+        log(`❌ Error reseteando solicitudes: ${err.message}`, "inv");
+      }
+    }
+
+    async function resetOrdenes() {
+      try {
+        log("♻️ Reseteando órdenes de fabricación...", "send");
+        await getJson(`${host}/api/fabricacion/ordenes/reset`, {method: "POST"});
+        log("✅ Órdenes de fabricación reseteadas", "inv");
+        refresh();
+      } catch (err) {
+        log(`❌ Error reseteando órdenes: ${err.message}`, "inv");
+      }
     }
 
     async function getJson(url, opts = {}) {
@@ -202,10 +377,18 @@
         const s2 = prod.find(p => p.id_producto === "S2" && p.estado === "Disponible");
         const p1 = piezas.find(p => p.id_pieza === "P1");
         const p2 = piezas.find(p => p.id_pieza === "P2");
+        const p3 = piezas.find(p => p.id_pieza === "P3");
+        const p4 = piezas.find(p => p.id_pieza === "P4");
+        const p5 = piezas.find(p => p.id_pieza === "P5");
+        const p6 = piezas.find(p => p.id_pieza === "P6");
         document.getElementById("kpi-s1").textContent = s1 ? s1.cantidad : "-";
         document.getElementById("kpi-s2").textContent = s2 ? s2.cantidad : "-";
         document.getElementById("kpi-p1").textContent = p1 ? p1.cantidad : "-";
         document.getElementById("kpi-p2").textContent = p2 ? p2.cantidad : "-";
+        document.getElementById("kpi-p3").textContent = p3 ? p3.cantidad : "-";
+        document.getElementById("kpi-p4").textContent = p4 ? p4.cantidad : "-";
+        document.getElementById("kpi-p5").textContent = p5 ? p5.cantidad : "-";
+        document.getElementById("kpi-p6").textContent = p6 ? p6.cantidad : "-";
 
         renderProductos(prod);
         renderPiezas(piezas);
@@ -233,26 +416,9 @@
     }
     function renderOrdenes(items) {
       const t = document.getElementById("tbl-ordenes");
-      const estadoLabels = {
-        'pending': 'Pendiente',
-        'pendiente': 'Pendiente',
-        'calculando': '🔢 Calculando',
-        'confirmando': '📤 Confirmando',
-        'confirmado': '✅ Confirmado',
-        'confirmacion_fallida': '⚠️ Conf. Fallida',
-        'consumiendo_piezas': '⚙️ Consumiendo',
-        'en_proceso': 'En Proceso',
-        'esperando_fabricacion': '🏭 En Fábrica',
-        'completada': 'Completada',
-        'fallida': 'Fallida'
-      };
-
-      t.innerHTML = "<tr><th>ID</th><th>Prod</th><th>Cant</th><th>Progreso</th><th>Estado</th><th>Tiempo</th><th>Detalles</th></tr>" +
+      t.innerHTML = "<tr><th>ID</th><th>Prod</th><th>Cant</th><th>Progreso</th><th>Detalles</th></tr>" +
         items.map(o => {
           const tiempo = o.tiempo_estimado ?? (o.detalle?.tiempo_total || "");
-          const estadoKey = o.estado.toLowerCase().replace(' ', '_');
-          const estadoLabel = estadoLabels[estadoKey] || o.estado;
-          const dotClass = `status-${estadoKey}`;
           const fabricacionExterna = o.detalle?.fabricacion_externa ? '🏭' : '';
           const mensaje = o.detalle?.mensaje || '';
 
@@ -280,39 +446,37 @@
             <td>${o.id_producto}</td>
             <td>${o.cantidad}</td>
             <td>${progreso}</td>
-            <td><span class="status-dot ${dotClass}"></span>${estadoLabel}</td>
-            <td>${tiempo}min</td>
             <td>${fabricacionExterna} ${pasosInfo}</td>
           </tr>`;
         }).join("");
     }
 
     async function encolarSolicitudesDesdePlan(codigo, cantidad) {
-      log(`🔄 GET ${host}/api/fabricacion/plan/${codigo}?cantidad=${cantidad}`);
+      log(`🔄 GET ${host}/api/fabricacion/plan/${codigo}?cantidad=${cantidad}`, "send");
       const plan = await getJson(`${host}/api/fabricacion/plan/${codigo}?cantidad=${cantidad}`);
-      log(`   ⏱️ Tiempo: ${plan.tiempo_estimado}min | Materiales: ${plan.materiales.length}`);
+      log(`   ⏱️ Tiempo: ${plan.tiempo_estimado}min | Materiales: ${plan.materiales.length}`, "inv");
 
       const solicitudes = [];
       for (const m of plan.materiales) {
         const faltante = Math.max(m.cantidad_requerida - m.cantidad_disponible, 0);
         if (faltante > 0) {
-          log(`🔄 POST ${host}/api/proveedores/solicitudes_async - Pieza ${m.id_pieza} x${faltante}`);
+          log(`🔄 POST ${host}/api/proveedores/solicitudes_async - Pieza ${m.id_pieza} x${faltante}`, "send");
           const resp = await getJson(`${host}/api/proveedores/solicitudes_async`, {
             method: "POST",
             headers: {"Content-Type":"application/json"},
             body: JSON.stringify({id_pieza: m.id_pieza, cantidad: faltante})
           });
           solicitudes.push(resp.id);
-          log(`   ✅ Solicitud #${resp.id} encolada (estado: ${resp.estado})`);
+          log(`   ✅ Solicitud #${resp.id} encolada (estado: ${resp.estado})`, "inv");
         } else {
-          log(`   ℹ️ ${m.id_pieza}: stock suficiente (${m.cantidad_disponible} disponible)`);
+          log(`   ℹ️ ${m.id_pieza}: stock suficiente (${m.cantidad_disponible} disponible)`, "inv");
         }
       }
       return solicitudes;
     }
 
     async function encolarOrden(codigo, cantidad) {
-      log(`🔄 POST ${host}/api/fabricacion/ordenes - ${codigo} x${cantidad}`);
+      log(`🔄 POST ${host}/api/fabricacion/ordenes - ${codigo} x${cantidad}`, "send");
       const resp = await getJson(`${host}/api/fabricacion/ordenes`, {
         method: "POST",
         headers: {"Content-Type":"application/json"},
@@ -324,17 +488,17 @@
       if (resp.detalle?.pasos && resp.detalle.pasos.length > 0) {
         log(`   📋 Orden #${resp.id} - Flujo de confirmación:`);
         resp.detalle.pasos.forEach(paso => {
-          log(`      ${paso}`);
+          log(`      ${paso}`, "inv");
         });
       }
 
-      log(`   ✅ Orden #${resp.id} completada - Estado: ${resp.estado} | Tiempo: ${tiempo}min`);
+      log(`   ✅ Orden #${resp.id} completada - Estado: ${resp.estado} | Tiempo: ${tiempo}min`, "inv");
 
       // Indicar si fue confirmada con fábrica externa
       if (resp.detalle?.confirmacion_fabrica) {
-        log(`   🏭 Confirmación fábrica externa: ${JSON.stringify(resp.detalle.confirmacion_fabrica)}`);
+        log(`   🏭 Confirmación fábrica externa: ${JSON.stringify(resp.detalle.confirmacion_fabrica)}`, "recv");
       } else if (resp.detalle?.fabricacion_externa === false) {
-        log(`   ⚠️ Fábrica externa no disponible, usando fabricación local`);
+        log(`   ⚠️ Fábrica externa no disponible, usando fabricación local`, "inv");
       }
 
       return resp.id;
@@ -342,15 +506,15 @@
 
     async function simularOrdenes() {
       try {
-        log("🚀 Simulación completa: Calculando faltantes y encolando S1 y S2...");
+        log("🚀 Simulación completa: Calculando faltantes y encolando S1 y S2...", "inv");
         const qty1 = parseInt(document.getElementById("qty-s1").value);
         const qty2 = parseInt(document.getElementById("qty-s2").value);
         const s1Sol = await encolarSolicitudesDesdePlan("S1", qty1);
         const s2Sol = await encolarSolicitudesDesdePlan("S2", qty2);
         const ordenS1 = await encolarOrden("S1", qty1);
         const ordenS2 = await encolarOrden("S2", qty2);
-        log(`✅ Solicitudes S1: [${s1Sol.join(",")}] | S2: [${s2Sol.join(",")}]`);
-        log(`✅ Órdenes encoladas -> S1: ${ordenS1}, S2: ${ordenS2}`);
+        log(`✅ Solicitudes S1: [${s1Sol.join(",")}] | S2: [${s2Sol.join(",")}]`, "inv");
+        log(`✅ Órdenes encoladas -> S1: ${ordenS1}, S2: ${ordenS2}`, "inv");
         refresh();
       } catch (err) {
         log(`❌ Error en simulación: ${err.message}`);
@@ -375,17 +539,17 @@
         const qty = parseInt(document.getElementById(`qty-${codigo.toLowerCase()}`).value);
         log(`🔍 Consultando plan de fabricación para ${codigo} x${qty}...`);
         const plan = await getJson(`${host}/api/fabricacion/plan/${codigo}?cantidad=${qty}`);
-        log(`📋 Plan ${codigo}:`);
-        log(`   Tiempo estimado: ${plan.tiempo_estimado} min`);
-        log(`   Materiales necesarios:`);
+        log(`📋 Plan ${codigo}:`, "inv");
+        log(`   Tiempo estimado: ${plan.tiempo_estimado} min`, "inv");
+        log(`   Materiales necesarios:`, "inv");
         plan.materiales.forEach(m => {
           const faltante = Math.max(m.cantidad_requerida - m.cantidad_disponible, 0);
           const status = faltante > 0 ? "⚠️ FALTA" : "✅ OK";
-          log(`   - ${m.id_pieza}: ${m.cantidad_requerida} req, ${m.cantidad_disponible} disp, ${faltante} faltante ${status}`);
+          log(`   - ${m.id_pieza}: ${m.cantidad_requerida} req, ${m.cantidad_disponible} disp, ${faltante} faltante ${status}`, "inv");
         });
-        log(`   Fuente: ${plan.fuente_datos || 'Plan interno'}`);
+        log(`   Fuente: ${plan.fuente_datos || 'Plan interno'}`, "inv");
       } catch (err) {
-        log(`❌ Error consultando plan ${codigo}: ${err.message}`);
+        log(`❌ Error consultando plan ${codigo}: ${err.message}`, "inv");
       }
     }
 
@@ -394,6 +558,7 @@
         const status = await getJson(`${host}/api/fabricacion/external/status`);
 
         document.getElementById("ext-base").textContent = status.base_url || "Sin configurar";
+        document.getElementById("ext-url-input").value = status.base_url || "";
 
         if (status.conectado) {
           document.getElementById("ext-status").innerHTML = '<span style="color: #10b981;">🟢 Conectado</span>';

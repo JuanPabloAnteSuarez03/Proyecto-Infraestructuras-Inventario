@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:15
+    container_name: fabricacion_db
+    restart: always
+    environment:
+      POSTGRES_USER: fabricacion_user
+      POSTGRES_PASSWORD: fabricacion_pass
+      POSTGRES_DB: fabricacion_db
+    ports:
+      - "5545:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - fabricacion_net
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fabricacion_api
+    restart: always
+    depends_on:
+      - db
+    environment:
+      DB_USER: fabricacion_user
+      DB_PASS: fabricacion_pass
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: fabricacion_db
+      API_PATH_INVENTARIO: http://100.110.27.44:5000/api/productos/ingresos
+    ports:
+      - "8555:8000"
+    networks:
+      - fabricacion_net
+
+volumes:
+  postgres_data:
+
+networks:
+  fabricacion_net:

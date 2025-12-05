@@ -1,8 +1,12 @@
 FABRICACION_PLAN = {
     "S1": {
         "piezas": [
-            {"id_pieza": "P1", "cantidad": 2},
+            {"id_pieza": "P1", "cantidad": 1},
             {"id_pieza": "P2", "cantidad": 1},
+            {"id_pieza": "P3", "cantidad": 1},
+            {"id_pieza": "P4", "cantidad": 1},
+            {"id_pieza": "P5", "cantidad": 1},
+            {"id_pieza": "P6", "cantidad": 1},
         ],
         "tiempo_produccion": 3,
     },

@@ -257,10 +257,15 @@ def test_calcular_piezas(client):
     assert data["codigo"] == "S1"
     assert data["cantidad_solicitada"] == 3
     piezas = {item["codigo"]: item for item in data["piezas"]}
-    assert piezas["P1"]["cantidad_por_unidad"] == 2
-    assert piezas["P1"]["cantidad_total"] == 6
+    assert piezas["P1"]["cantidad_por_unidad"] == 1
+    assert piezas["P1"]["cantidad_total"] == 3
     assert piezas["P2"]["cantidad_por_unidad"] == 1
     assert piezas["P2"]["cantidad_total"] == 3
+    # Plan interno alineado con fábrica: P1..P6, 1 unidad cada uno
+    assert piezas["P3"]["cantidad_por_unidad"] == 1
+    assert piezas["P4"]["cantidad_por_unidad"] == 1
+    assert piezas["P5"]["cantidad_por_unidad"] == 1
+    assert piezas["P6"]["cantidad_por_unidad"] == 1
 
     resp_invalido = client.post(
         "/api/fabricacion/calcular_piezas",

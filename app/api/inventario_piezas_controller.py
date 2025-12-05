@@ -1,21 +1,25 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from marshmallow import ValidationError
-from ..schemas.inventory import InventarioPiezaSchema
 from ..schemas.api_models import PiezaCreate, PiezaUpdate
 from ..database import get_db
-from ..services.inventario_piezas_service import InventarioPiezasService
+from ..services import InventarioPiezasService
 
 router = APIRouter(prefix="/api/piezas", tags=["piezas"])
-pieza_schema = InventarioPiezaSchema()
-piezas_schema = InventarioPiezaSchema(many=True)
+
+
+def serialize_pieza(pieza):
+    return {
+        "id_pieza": pieza.id_pieza,
+        "cantidad": pieza.cantidad,
+        "id_proveedor": pieza.id_proveedor,
+    }
 
 
 @router.get("")
 def listar_piezas(db: Session = Depends(get_db)):
     service = InventarioPiezasService(db)
     piezas = service.list()
-    return piezas_schema.dump(piezas)
+    return [serialize_pieza(p) for p in piezas]
 
 
 @router.get("/{pieza_id}")
@@ -24,19 +28,15 @@ def obtener_pieza(pieza_id: str, db: Session = Depends(get_db)):
     pieza = service.retrieve(pieza_id)
     if not pieza:
         raise HTTPException(status_code=404, detail="Pieza no encontrada")
-    return pieza_schema.dump(pieza)
+    return serialize_pieza(pieza)
 
 
 @router.post("", status_code=201)
 def crear_pieza(body: PiezaCreate, db: Session = Depends(get_db)):
     service = InventarioPiezasService(db)
     payload = body.model_dump()
-    try:
-        data = pieza_schema.load(payload)
-    except ValidationError as exc:
-        raise HTTPException(status_code=400, detail=exc.messages)
-    pieza = service.create(data)
-    return pieza_schema.dump(pieza)
+    pieza = service.create(payload)
+    return serialize_pieza(pieza)
 
 
 @router.delete("/{pieza_id}")
@@ -48,16 +48,19 @@ def eliminar_pieza(pieza_id: str, db: Session = Depends(get_db)):
     return {"message": "Pieza eliminada"}
 
 
+@router.post("/reset")
+def resetear_piezas(db: Session = Depends(get_db)):
+    service = InventarioPiezasService(db)
+    total = service.reset_all()
+    return {"message": "Inventario de piezas reseteado", "registros": total}
+
+
 @router.put("/{pieza_id}")
 def actualizar_pieza(pieza_id: str, body: PiezaUpdate, db: Session = Depends(get_db)):
     service = InventarioPiezasService(db)
     payload = body.model_dump(exclude_unset=True)
-    try:
-        data = pieza_schema.load(payload, partial=True)
-    except ValidationError as exc:
-        raise HTTPException(status_code=400, detail=exc.messages)
-    data.pop("id_pieza", None)
-    pieza = service.update(pieza_id, data)
+    payload.pop("id_pieza", None)
+    pieza = service.update(pieza_id, payload)
     if not pieza:
         raise HTTPException(status_code=404, detail="Pieza no encontrada")
-    return pieza_schema.dump(pieza)
+    return serialize_pieza(pieza)

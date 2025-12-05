@@ -1,7 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from marshmallow import ValidationError
-from ..schemas.inventory import ProveedorSchema, SolicitudPiezasSchema
 from ..schemas.api_models import (
     ProveedorCreate,
     ProveedorUpdate,
@@ -9,33 +7,34 @@ from ..schemas.api_models import (
     SolicitudPiezaAsync,
 )
 from ..database import get_db
-from ..services.proveedores_service import ProveedoresService
-from ..services import SolicitudesPiezaService
+from ..services import ProveedoresService, SolicitudesPiezaService
 from ..tasks import queue, procesar_solicitud_pieza
 
 router = APIRouter(prefix="/api/proveedores", tags=["proveedores"])
-proveedor_schema = ProveedorSchema()
-proveedores_schema = ProveedorSchema(many=True)
-solicitud_piezas_schema = SolicitudPiezasSchema()
+
+
+def serialize_proveedor(p):
+    return {
+        "id_proveedor": p.id_proveedor,
+        "nombre": p.nombre,
+        "cantidad": p.cantidad,
+        "tiempo": p.tiempo,
+    }
 
 
 @router.get("")
 def listar_proveedores(db: Session = Depends(get_db)):
     service = ProveedoresService(db)
     proveedores = service.list()
-    return proveedores_schema.dump(proveedores)
+    return [serialize_proveedor(p) for p in proveedores]
 
 
 @router.post("", status_code=201)
 def crear_proveedor(body: ProveedorCreate, db: Session = Depends(get_db)):
     service = ProveedoresService(db)
     payload = body.model_dump()
-    try:
-        data = proveedor_schema.load(payload)
-    except ValidationError as exc:
-        raise HTTPException(status_code=400, detail=exc.messages)
-    proveedor = service.create(data)
-    return proveedor_schema.dump(proveedor)
+    proveedor = service.create(payload)
+    return serialize_proveedor(proveedor)
 
 
 @router.delete("/{proveedor_id}")
@@ -53,15 +52,11 @@ def actualizar_proveedor(
 ):
     service = ProveedoresService(db)
     payload = body.model_dump(exclude_unset=True)
-    try:
-        data = proveedor_schema.load(payload, partial=True)
-    except ValidationError as exc:
-        raise HTTPException(status_code=400, detail=exc.messages)
-    data.pop("id_proveedor", None)
-    proveedor = service.update(proveedor_id, data)
+    payload.pop("id_proveedor", None)
+    proveedor = service.update(proveedor_id, payload)
     if not proveedor:
         raise HTTPException(status_code=404, detail="Proveedor no encontrado")
-    return proveedor_schema.dump(proveedor)
+    return serialize_proveedor(proveedor)
 
 
 @router.post("/solicitudes")
@@ -69,12 +64,8 @@ def solicitar_piezas(body: SolicitudPiezas, db: Session = Depends(get_db)):
     service = ProveedoresService(db)
     payload = body.model_dump()
     try:
-        data = solicitud_piezas_schema.load(payload)
-    except ValidationError as exc:
-        raise HTTPException(status_code=400, detail=exc.messages)
-    try:
         resultado = service.solicitar_piezas(
-            pieza_id=data["id_pieza"], cantidad=data["cantidad"]
+            pieza_id=payload["id_pieza"], cantidad=payload["cantidad"]
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -85,12 +76,8 @@ def solicitar_piezas(body: SolicitudPiezas, db: Session = Depends(get_db)):
 def solicitar_piezas_async(body: SolicitudPiezaAsync, db: Session = Depends(get_db)):
     solicitudes_service = SolicitudesPiezaService(db)
     payload = body.model_dump()
-    try:
-        data = solicitud_piezas_schema.load(payload)
-    except ValidationError as exc:
-        raise HTTPException(status_code=400, detail=exc.messages)
     solicitud = solicitudes_service.create(
-        {"id_pieza": data["id_pieza"], "cantidad": data["cantidad"], "estado": "pendiente"}
+        {"id_pieza": payload["id_pieza"], "cantidad": payload["cantidad"], "estado": "pendiente"}
     )
     queue.enqueue(procesar_solicitud_pieza, solicitud.id)
     return {
@@ -131,10 +118,17 @@ def listar_solicitudes_async(db: Session = Depends(get_db)):
     ]
 
 
+@router.post("/solicitudes_async/reset")
+def resetear_solicitudes_async(db: Session = Depends(get_db)):
+    solicitudes_service = SolicitudesPiezaService(db)
+    total = solicitudes_service.delete_all()
+    return {"message": "Solicitudes async reseteadas", "registros": total}
+
+
 @router.get("/{proveedor_id}")
 def obtener_proveedor(proveedor_id: int, db: Session = Depends(get_db)):
     service = ProveedoresService(db)
     proveedor = service.retrieve(proveedor_id)
     if not proveedor:
         raise HTTPException(status_code=404, detail="Proveedor no encontrado")
-    return proveedor_schema.dump(proveedor)
+    return serialize_proveedor(proveedor)

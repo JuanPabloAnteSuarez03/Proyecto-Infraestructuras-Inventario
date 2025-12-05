@@ -1,10 +1,19 @@
-from .inventario_productos_service import InventarioProductosService
-from .inventario_piezas_service import InventarioPiezasService
-from .proveedores_service import ProveedoresService
-from .movimientos_service import MovimientosService
-from .fabricacion_service import FabricacionService
-from .solicitudes_service import SolicitudesPiezaService
-from .ordenes_service import OrdenesFabricacionService
+from app.services.inventario import (
+    InventarioProductosService,
+    InventarioPiezasService,
+    MovimientosService,
+)
+from app.services.proveedores import (
+    ProveedoresService,
+    SolicitudesPiezaService,
+)
+from app.services.fabricacion import (
+    FabricacionService,
+    PlanFabricacion,
+    EntregasFabricacionService,
+    FabricacionOrchestrator,
+    OrdenesFabricacionService,
+)
 
 __all__ = [
     "InventarioProductosService",
@@ -14,4 +23,7 @@ __all__ = [
     "FabricacionService",
     "SolicitudesPiezaService",
     "OrdenesFabricacionService",
+    "EntregasFabricacionService",
+    "FabricacionOrchestrator",
+    "PlanFabricacion",
 ]

@@ -1,20 +1,30 @@
 import os
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from .routes import register_routes
 from .database import Base, engine
+from .core.logging_config import setup_logging
 
 
 def create_app(config_name: str | None = None) -> FastAPI:
     """Factory FastAPI con SQLAlchemy puro (sin Flask)."""
-    env_config = config_name or os.getenv("FLASK_ENV", "development")
+    env_config = (
+        config_name
+        or os.getenv("APP_ENV")
+        or os.getenv("FLASK_ENV")  # compat con variables antiguas
+        or "development"
+    )
 
-    app = FastAPI(title="API Inventarios", version="1.0.0")
+    setup_logging()
 
-    @app.on_event("startup")
-    def _init_models() -> None:
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
         Base.metadata.create_all(bind=engine)
+        yield
+
+    app = FastAPI(title="API Inventarios", version="1.0.0", lifespan=lifespan)
 
     app.add_middleware(
         CORSMiddleware,
