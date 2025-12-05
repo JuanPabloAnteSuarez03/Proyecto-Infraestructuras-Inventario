@@ -145,3 +145,5 @@ dmypy.json
 # External repos (duplicates)
 external/fabricacion-api/
 external/*.zip
+external/fabricacion-api-main/
+external/fabricacion-apiv2/
