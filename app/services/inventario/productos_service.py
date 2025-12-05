@@ -12,12 +12,35 @@ from app.services.proveedores.proveedores_service import ProveedoresService
 
 
 class InventarioProductosService:
+    """
+    Servicio para gestionar el inventario de productos terminados.
+
+    Maneja productos en tres estados: Disponible, Reservado y A Despacho.
+    Coordina con servicios de fabricación y proveedores para mantener
+    niveles de stock óptimos mediante reposición automática.
+
+    Responsabilidades:
+    - CRUD de productos en inventario
+    - Transferencias entre estados
+    - Reservas para ventas con reposición automática
+    - Despachos de productos
+    - Coordinación con fabricación cuando stock es bajo
+    """
+
     def __init__(
         self,
         session: Session,
         repository: InventarioProductosRepository | None = None,
         piezas_repository: InventarioPiezasRepository | None = None,
     ) -> None:
+        """
+        Inicializa el servicio de inventario de productos.
+
+        Args:
+            session: Sesión de base de datos SQLAlchemy
+            repository: Repositorio de productos (opcional, se crea si no se provee)
+            piezas_repository: Repositorio de piezas (opcional, se crea si no se provee)
+        """
         self.session = session
         self.repository = repository or InventarioProductosRepository(session)
         self.piezas_repository = piezas_repository or InventarioPiezasRepository(session)
@@ -25,6 +48,7 @@ class InventarioProductosService:
         self.proveedores_service = ProveedoresService(
             session, piezas_repository=self.piezas_repository
         )
+        # Configuración de políticas de stock
         self.stock_minimo = 500
         self.stock_objetivo = 1000
         self.lote_produccion = 500
@@ -32,14 +56,39 @@ class InventarioProductosService:
         self.piezas_stock_objetivo = 1000
 
     def list(self) -> list[InventarioProducto]:
+        """
+        Obtiene todos los productos en inventario (todos los estados).
+
+        Returns:
+            Lista de todos los registros de inventario de productos
+        """
         return self.repository.get_all()
 
     def reset_all(self) -> int:
+        """
+        Resetea todas las cantidades de productos a cero.
+
+        ADVERTENCIA: Esta operación es destructiva y afecta todos los productos
+        en todos los estados.
+
+        Returns:
+            Número de registros actualizados
+        """
         updated = self.session.query(InventarioProducto).update({"cantidad": 0})
         self.session.commit()
         return updated
 
     def list_by_producto(self, producto_id: str) -> list[InventarioProducto]:
+        """
+        Obtiene todos los estados de un producto específico.
+
+        Args:
+            producto_id: Código del producto (S1, S2, etc.)
+
+        Returns:
+            Lista de registros del producto en diferentes estados,
+            ordenados por estado
+        """
         codigo = normalize_producto_codigo(producto_id)
         return (
             self.session.query(InventarioProducto)
