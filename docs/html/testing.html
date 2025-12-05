@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Guía de Testing - Sistema de Inventario</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        
+:root {
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --secondary: #8b5cf6;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --dark: #1e293b;
+    --gray: #64748b;
+    --light: #f1f5f9;
+    --white: #ffffff;
+    --border: #e2e8f0;
+    --code-bg: #282c34;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: var(--light);
+    color: var(--dark);
+    line-height: 1.7;
+}
+
+.navbar {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.nav-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-brand {
+    color: var(--white);
+    font-size: 1.25rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.nav-links {
+    display: flex;
+    gap: 24px;
+}
+
+.nav-links a {
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s;
+}
+
+.nav-links a:hover {
+    color: var(--white);
+}
+
+.container {
+    max-width: 1400px;
+    margin: 40px auto;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 40px;
+    padding: 0 24px;
+}
+
+.sidebar {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 24px;
+    height: fit-content;
+    position: sticky;
+    top: 100px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.sidebar h3 {
+    color: var(--dark);
+    font-size: 1.1rem;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--primary);
+}
+
+.sidebar-menu {
+    list-style: none;
+}
+
+.sidebar-menu li {
+    margin-bottom: 8px;
+}
+
+.sidebar-menu a {
+    display: block;
+    padding: 10px 12px;
+    color: var(--gray);
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.3s;
+    font-size: 0.95rem;
+}
+
+.sidebar-menu a:hover {
+    background: var(--primary);
+    color: var(--white);
+    transform: translateX(4px);
+}
+
+.content {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 40px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    min-height: 600px;
+}
+
+.content h1 {
+    color: var(--dark);
+    font-size: 2.5rem;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 3px solid var(--primary);
+}
+
+.content h2 {
+    color: var(--dark);
+    font-size: 2rem;
+    margin-top: 40px;
+    margin-bottom: 20px;
+    padding-left: 12px;
+    border-left: 4px solid var(--primary);
+}
+
+.content h3 {
+    color: var(--dark);
+    font-size: 1.5rem;
+    margin-top: 32px;
+    margin-bottom: 16px;
+}
+
+.content p {
+    margin-bottom: 16px;
+    color: var(--gray);
+}
+
+.content ul, .content ol {
+    margin: 16px 0 16px 24px;
+    color: var(--gray);
+}
+
+.content li {
+    margin-bottom: 8px;
+}
+
+.content a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.content a:hover {
+    text-decoration: underline;
+}
+
+.content code {
+    font-family: 'Fira Code', monospace;
+    background: var(--light);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: var(--danger);
+}
+
+.content pre {
+    background: var(--code-bg);
+    border-radius: 8px;
+    padding: 20px;
+    overflow-x: auto;
+    margin: 20px 0;
+}
+
+.content pre code {
+    background: none;
+    color: #abb2bf;
+    padding: 0;
+}
+
+.content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+}
+
+.content th {
+    background: var(--primary);
+    color: var(--white);
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+}
+
+.content td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.content tr:hover {
+    background: var(--light);
+}
+
+.content blockquote {
+    border-left: 4px solid var(--primary);
+    padding: 16px 20px;
+    margin: 20px 0;
+    background: var(--light);
+    border-radius: 0 8px 8px 0;
+}
+
+.footer {
+    text-align: center;
+    padding: 40px 24px;
+    color: var(--gray);
+}
+
+.footer a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+@media (max-width: 1024px) {
+    .container {
+        grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+        position: relative;
+        top: 0;
+    }
+}
+
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="../index.html" class="nav-brand">📚 Documentación Inventario</a>
+            <div class="nav-links">
+                <a href="../index.html">🏠 Inicio</a>
+                <a href="00_indice.html">📑 Índice</a>
+                <a href="https://github.com" target="_blank">💻 GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <aside class="sidebar">
+            <h3>📖 Navegación</h3>
+            <ul class="sidebar-menu">
+                <li><a href="00_indice.html">🗺️ Índice</a></li>
+                <li><a href="01_arquitectura.html">🏗️ Arquitectura</a></li>
+                <li><a href="02_sistema_colas.html">🔄 Sistema de Colas</a></li>
+                <li><a href="03_paralelismo.html">⚡ Paralelismo</a></li>
+                <li><a href="04_flujos.html">📊 Flujos</a></li>
+                <li><a href="05_guia_desarrollo.html">🛠️ Desarrollo</a></li>
+                <li><a href="readme.html">📖 README</a></li>
+                <li><a href="testing.html">🧪 Testing</a></li>
+            </ul>
+        </aside>
+
+        <main class="content">
+            <h1>🧪 Guía de Testing</h1>
+
+<h2>Introducción</h2>
+
+<p>Esta guía cubre cómo testear el sistema de inventario, incluyendo pruebas unitarias, de integración y de workers asíncronos.</p>
+
+<h2>Configuración de Testing</h2>
+
+<h3>Instalación de Dependencias</h3>
+
+<pre><code class="language-bash"><h1> Instalar dependencias de desarrollo</h1>
+pip install -r requirements-dev.txt</code></pre>
+
+<strong>requirements-dev.txt:</strong>
+<pre><code class="language-">pytest==7.4.3
+pytest-cov==4.1.0
+pytest-asyncio==0.21.1</code></pre>
+
+<h3>Configuración de Test Database</h3>
+
+<p>Los tests usan SQLite en memoria por defecto para aislar las pruebas.</p>
+
+<strong>Archivo:</strong> <code>tests/conftest.py</code>
+
+<pre><code class="language-python">import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from app.database import Base
+
+@pytest.fixture(scope="function")
+def test_db_session():
+    """Crear sesión de BD en memoria para cada test."""
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    SessionLocal = sessionmaker(bind=engine)
+    session = SessionLocal()
+    
+    yield session
+    
+    session.close()
+    Base.metadata.drop_all(engine)</code></pre>
+
+<h2>Ejecutar Tests</h2>
+
+<h3>Todos los Tests</h3>
+
+<pre><code class="language-bash"><h1>Dentro del contenedor</h1>
+docker compose exec api pytest
+
+<h1>Localmente (si tienes Python configurado)</h1>
+pytest</code></pre>
+
+<h3>Tests con Verbosity</h3>
+
+<pre><code class="language-bash">pytest -v
+<h1>Muestra cada test individualmente</h1></code></pre>
+
+<h3>Tests Específicos</h3>
+
+<pre><code class="language-bash"><h1>Un archivo específico</h1>
+pytest tests/test_productos.py
+
+<h1>Una clase específica</h1>
+pytest tests/test_productos.py::TestProductosService
+
+<h1>Un test específico</h1>
+pytest tests/test_productos.py::test_incrementar_stock</code></pre>
+
+<h3>Coverage</h3>
+
+<pre><code class="language-bash"><h1>Ver cobertura</h1>
+pytest --cov=app tests/
+
+<h1>Generar reporte HTML</h1>
+pytest --cov=app --cov-report=html tests/
+<h1>Abre htmlcov/index.html</h1></code></pre>
+
+<h2>Tests de Servicios</h2>
+
+<h3>Ejemplo: Test de ProductosService</h3>
+
+<strong>Archivo:</strong> <code>tests/test_productos_service.py</code>
+
+<pre><code class="language-python">import pytest
+from app.services.inventario.productos_service import InventarioProductosService
+from app.repositories.productos_repository import InventarioProductosRepository
+
+def test_incrementar_stock(test_db_session):
+    """Test de incremento de stock."""
+    # Arrange
+    repo = InventarioProductosRepository(test_db_session)
+    service = InventarioProductosService(test_db_session, repository=repo)
+    
+    # Crear producto inicial
+    repo.create({"id_producto": "S1", "estado": "Disponible", "cantidad": 100})
+    
+    # Act
+    service.incrementar_stock("S1", 50, "Disponible")
+    
+    # Assert
+    producto = repo.get_by_codigo_estado("S1", "Disponible")
+    assert producto.cantidad == 150
+
+def test_transferir_stock(test_db_session):
+    """Test de transferencia entre estados."""
+    # Arrange
+    repo = InventarioProductosRepository(test_db_session)
+    service = InventarioProductosService(test_db_session, repository=repo)
+    
+    repo.create({"id_producto": "S1", "estado": "Disponible", "cantidad": 100})
+    repo.create({"id_producto": "S1", "estado": "Reservado", "cantidad": 0})
+    
+    # Act
+    service.transferir_stock("S1", "Disponible", "Reservado", 30)
+    
+    # Assert
+    disponible = repo.get_by_codigo_estado("S1", "Disponible")
+    reservado = repo.get_by_codigo_estado("S1", "Reservado")
+    assert disponible.cantidad == 70
+    assert reservado.cantidad == 30
+
+def test_transferir_stock_insuficiente(test_db_session):
+    """Test de transferencia con stock insuficiente."""
+    # Arrange
+    repo = InventarioProductosRepository(test_db_session)
+    service = InventarioProductosService(test_db_session, repository=repo)
+    
+    repo.create({"id_producto": "S1", "estado": "Disponible", "cantidad": 10})
+    repo.create({"id_producto": "S1", "estado": "Reservado", "cantidad": 0})
+    
+    # Act & Assert
+    with pytest.raises(ValueError, match="Stock insuficiente"):
+        service.transferir_stock("S1", "Disponible", "Reservado", 50)</code></pre>
+
+<h2>Tests de Endpoints (FastAPI)</h2>
+
+<h3>Usando TestClient</h3>
+
+<strong>Archivo:</strong> <code>tests/test_api_productos.py</code>
+
+<pre><code class="language-python">from fastapi.testclient import TestClient
+from app import create_app
+
+@pytest.fixture
+def client():
+    """Cliente de test para FastAPI."""
+    app = create_app()
+    return TestClient(app)
+
+def test_listar_productos(client):
+    """Test GET /api/productos."""
+    response = client.get("/api/productos")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+
+def test_crear_producto(client):
+    """Test POST /api/productos."""
+    payload = {
+        "id_producto": "S1",
+        "estado": "Disponible",
+        "cantidad": 100
+    }
+    response = client.post("/api/productos", json=payload)
+    assert response.status_code == 201
+    data = response.json()
+    assert data["id_producto"] == "S1"
+    assert data["cantidad"] == 100
+
+def test_transferencia(client):
+    """Test POST /api/productos/transferencias."""
+    payload = {
+        "id_producto": "S1",
+        "estado_origen": "Disponible",
+        "estado_destino": "Reservado",
+        "cantidad": 30
+    }
+    response = client.post("/api/productos/transferencias", json=payload)
+    assert response.status_code == 200</code></pre>
+
+<h2>Tests de Workers (RQ)</h2>
+
+<h3>Mockear Cola</h3>
+
+<strong>Archivo:</strong> <code>tests/test_workers.py</code>
+
+<pre><code class="language-python">from unittest.mock import Mock, patch
+from app.tasks import procesar_solicitud_pieza
+
+def test_procesar_solicitud_pieza(test_db_session):
+    """Test del worker de solicitud de pieza."""
+    # Arrange: Crear datos iniciales
+    from app.services.proveedores.solicitudes_service import SolicitudesPiezaService
+    from app.services.inventario.piezas_service import InventarioPiezasService
+    from app.services.proveedores.proveedores_service import ProveedoresService
+    
+    # Crear proveedor
+    proveedores_service = ProveedoresService(test_db_session)
+    proveedor = proveedores_service.create({
+        "id_proveedor": 1,
+        "nombre": "Prov1",
+        "cantidad": 1000,
+        "tiempo": 5
+    })
+    
+    # Crear pieza
+    piezas_service = Invent arioPiezasService(test_db_session)
+    pieza = piezas_service.create({
+        "id_pieza": 1,
+        "nombre": "Pieza 1",
+        "cantidad": 50,
+        "id_proveedor": 1
+    })
+    
+    # Crear solicitud
+    solicitudes_service = SolicitudesPiezaService(test_db_session)
+    solicitud = solicitudes_service.create({
+        "id_pieza": 1,
+        "cantidad": 100,
+        "estado": "pendiente"
+    })
+    
+    # Act: Ejecutar worker
+    with patch('time.sleep'):  # Mockear sleep para que sea instantáneo
+        procesar_solicitud_pieza(solicitud.id)
+    
+    # Assert
+    solicitud_actualizada = solicitudes_service.retrieve(solicitud.id)
+    assert solicitud_actualizada.estado == "completada"
+    
+    pieza_actualizada = piezas_service.retrieve(1)
+    assert pieza_actualizada.cantidad == 150  # 50 + 100</code></pre>
+
+<h2>Tests de Integración</h2>
+
+<h3>Test de Flujo Completo</h3>
+
+<strong>Archivo:</strong> <code>tests/test_integration.py</code>
+
+<pre><code class="language-python">def test_flujo_solicitud_asincrona(client, test_db_session):
+    """Test del flujo completo de solicitud asíncrona."""
+    # 1. Setup: Crear proveedor y pieza
+    # ... (crear datos iniciales)
+    
+    # 2. Solicitar pieza asíncronamente
+    response = client.post("/api/proveedores/solicitudes_async", json={
+        "id_pieza": 1,
+        "cantidad": 100
+    })
+    assert response.status_code == 202
+    data = response.json()
+    solicitud_id = data["id"]
+    assert data["estado"] == "pendiente"
+    
+    # 3. Simular procesamiento del worker
+    with patch('time.sleep'):
+        procesar_solicitud_pieza(solicitud_id)
+    
+    # 4. Verificar que solicitud está completada
+    response = client.get(f"/api/proveedores/solicitudes_async/{solicitud_id}")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["estado"] == "completada"
+    
+    # 5. Verificar que inventario se actualizó
+    response = client.get("/api/piezas/1")
+    data = response.json()
+    assert data["cantidad"] == 150  # Cantidad inicial + 100</code></pre>
+
+<h2>Comandos CLI de Testing</h2>
+
+<h3>Ejecutar Tests con Docker</h3>
+
+<pre><code class="language-bash"><h1>Ejecutar todos los tests</h1>
+docker compose exec api pytest
+
+<h1>Con verbosity</h1>
+docker compose exec api pytest -v
+
+<h1>Con coverage</h1>
+docker compose exec api pytest --cov=app tests/
+
+<h1>Test específico</h1>
+docker compose exec api pytest tests/test_productos.py -v
+
+<h1>Filtrar por nombre</h1>
+docker compose exec api pytest -k "transferir" -v</code></pre>
+
+<h3>Testing Local (sin Docker)</h3>
+
+<pre><code class="language-bash"><h1>Setup</h1>
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+
+<h1>Ejecutar</h1>
+pytest</code></pre>
+
+<h2>Estructura de Tests</h2>
+
+<pre><code class="language-">tests/
+├── conftest.py                    # Fixtures compartidos
+├── test_productos_service.py      # Tests de ProductosService
+├── test_piezas_service.py         # Tests de PiezasService
+├── test_proveedores_service.py    # Tests de ProveedoresService
+├── test_ordenes_service.py        # Tests de OrdenesService
+├── test_workers.py                # Tests de workers RQ
+├── test_api_productos.py          # Tests de endpoints /api/productos
+├── test_api_proveedores.py        # Tests de endpoints /api/proveedores
+├── test_api_fabricacion.py        # Tests de endpoints /api/fabricacion
+└── test_integration.py            # Tests de integración</code></pre>
+
+<h2>Mejores Prácticas</h2>
+
+<h3>✅ DO</h3>
+
+<p>1. <strong>Usar fixtures para setup</strong></p>
+   <pre><code class="language-python">   @pytest.fixture
+   def producto_inicial(test_db_session):
+       repo = InventarioProductosRepository(test_db_session)
+       return repo.create({"id_producto": "S1", "estado": "Disponible", "cantidad": 100})
+   ``<code>
+
+2. <strong>Nombrar tests descriptivamente</strong>
+   </code>`<code>python
+   def test_transferir_stock_cuando_hay_suficiente_entonces_actualiza_ambos_estados():
+       ...
+   </code>`<code>
+
+3. <strong>Seguir patrón AAA (Arrange, Act, Assert)</strong>
+   </code>`<code>python
+   def test_ejemplo():
+       # Arrange - Preparar datos
+       ...
+       # Act - Ejecutar acción
+       ...
+       # Assert - Verificar resultado
+       ...
+   </code>`<code>
+
+4. <strong>Mockear dependencias externas</strong>
+   </code>`<code>python
+   with patch('app.services.fabricacion.fabricacion_service.httpx.get') as mock_get:
+       mock_get.return_value.json.return_value = {"status": "ok"}
+       ...
+   </code>`<code>
+
+<h3>❌ DON'T</h3>
+
+1. <strong>No usar base de datos real en tests</strong>
+2. <strong>No hacer tests que dependan de orden</strong>
+3. <strong>No dejar prints/logs innecesarios</strong>
+4. <strong>No testear implementación, testear comportamiento</strong>
+
+<h2>Debugging Tests</h2>
+
+<h3>Con pdb</h3>
+</code></pre>python
+<p>def test_ejemplo():</p>
+<p>    import pdb; pdb.set_trace()</p>
+<p>    # Debugger se detendrá aquí</p>
+<p>    ...</p>
+<pre><code class="language-">
+<h3>Con pytest -s</h3>
+</code></pre>bash
+<h1>Mostrar prints</h1>
+<p>pytest -s tests/test_productos.py</p>
+<pre><code class="language-">
+<h3>Con verbosity máxima</h3>
+</code></pre>bash
+<p>pytest -vv tests/</p>
+<pre><code class="language-">
+<h2>CI/CD Integration</h2>
+
+<h3>GitHub Actions Example</h3>
+</code></pre>yaml
+<h1>.github/workflows/tests.yml</h1>
+<p>name: Tests</p>
+
+<p>on: [push, pull_request]</p>
+
+<p>jobs:</p>
+<p>  test:</p>
+<p>    runs-on: ubuntu-latest</p>
+<p>    steps:</p>
+<p>      - uses: actions/checkout@v2</p>
+<p>      - name: Set up Python</p>
+<p>        uses: actions/setup-python@v2</p>
+<p>        with:</p>
+<p>          python-version: 3.11</p>
+<p>      - name: Install dependencies</p>
+<p>        run: |</p>
+<p>          pip install -r requirements.txt</p>
+<p>          pip install -r requirements-dev.txt</p>
+<p>      - name: Run tests</p>
+<p>        run: pytest --cov=app tests/</p>
+</code>`<code>
+
+<h2>Próximos Pasos</h2>
+
+<p>1. <strong>Escribe tests para tu código nuevo</strong></p>
+<p>2. <strong>Mantén coverage > 80%</strong></p>
+<p>3. <strong>Ejecuta tests antes de hacer commit</strong></p>
+<p>4. <strong>Lee los tests existentes en </code>tests/` para entender patrones</strong></p>
+
+<p>---</p>
+
+<strong>Happy Testing!</strong> 🧪
+
+        </main>
+    </div>
+
+    <footer class="footer">
+        <p>Desarrollado con ❤️ usando FastAPI, Redis, RQ y PostgreSQL</p>
+        <p><a href="../index.html">← Volver al índice</a></p>
+    </footer>
+
+    <script>
+        hljs.highlightAll();
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</body>
+</html>

@@ -1,255 +1,458 @@
 # Microservicio de Inventarios
 
-Microservicio REST construido con FastAPI. Expone APIs JSON para gestionar inventarios de productos, piezas, proveedores y movimientos logísticos. La persistencia se realiza en PostgreSQL y toda la pila (API + BD) se orquesta con Docker Compose.
+Sistema de gestión de inventarios construido con **FastAPI**, **Redis**, **RQ** y **PostgreSQL**. Utiliza **procesamiento asíncrono** mediante colas de trabajo para manejar operaciones que requieren tiempo sin bloquear la API.
 
-## Stack principal
-- Python 3.11 + FastAPI + Pydantic
-- SQLAlchemy ORM
-- PostgreSQL 15
-- Redis + RQ para workers de solicitudes/órdenes
-- Docker Compose como entorno de ejecución
+> 📚 **Documentación completa:** Ver [00_INDICE.md](00_INDICE.md) para guías detalladas
 
-## Estructura del proyecto (núcleo)
-```
-app/
-├── api/                # Routers FastAPI
-├── models/             # Modelos SQLAlchemy
-├── repositories/       # Acceso a datos
-├── services/           # Lógica de negocio organizada por dominio
-│   ├── inventario/     # productos, piezas, movimientos
-│   ├── fabricacion/    # planes externos, orquestador, entregas
-│   └── proveedores/    # proveedores y solicitudes async
-├── domain/             # Constantes/planes puros
-├── core/               # utilidades transversales (logging, lifecycle)
-├── data/seed           # Archivos JSON de carga inicial
-├── cli.py              # Comandos utilitarios (create-db, seed-db)
-└── routes.py           # Registro central de rutas
-```
+## 🌟 Características
 
-## Puesta en marcha
-1. Copie el archivo de variables de entorno:
-   ```bash
-   cp .env.example .env
-   ```
-2. Levante la pila completa:
-   ```bash
-   docker compose up --build
-   ```
-3. Dentro del contenedor `api`, cree las tablas y cargue datos de ejemplo (JSON en `app/data/seed`):
-   ```bash
-   docker compose exec api python -m app.cli create-db
-   docker compose exec api python -m app.cli seed-db
-   ```
-4. La API quedará disponible en `http://localhost:5000`.
-   - La base de datos PostgreSQL queda expuesta en `localhost:5433` (útil si deseas conectarte con un cliente externo).
+- ✅ **API REST** con FastAPI (endpoints JSON)
+- ✅ **Procesamiento asíncrono** con Redis + RQ
+- ✅ **Gestión de inventario** de productos y piezas
+- ✅ **Órdenes de fabricación** con consumo automático de piezas  
+- ✅ **Solicitudes a proveedores** síncronas y asíncronas
+- ✅ **Multi-estado de productos** (Disponible, Reservado, A Despacho)
+- ✅ **Escalabilidad horizontal** (workers paralelos)
+- ✅ **Docker Compose** para desarrollo local
 
-## Endpoints disponibles
-Todos los recursos siguen el prefijo `/api` y aceptan/retornan JSON.
+## 🏗️ Stack Tecnológico
 
-| Recurso | GET colección | GET por id | POST | PUT | DELETE |
-|---------|---------------|------------|------|-----|--------|
-| Inventario de productos | `GET /api/productos` (todos los estados) / `GET /api/productos/<codigo>` (estados del producto) / `GET /api/productos/<codigo>/<estado>` (estado puntual) | Ver descripción | `POST /api/productos` (solo combinaciones válidas S1/S2 + estado) / `POST /api/productos/transferencias` para mover cantidades entre estados / `POST /api/productos/reservas` para reservar stock desde VENTAS / `POST /api/productos/despachos` para confirmar despacho / `POST /api/productos/ingresos` para sumar stock a un estado (`Disponible` por defecto) | `PUT /api/productos/<codigo>/<estado>` | `DELETE /api/productos/<codigo>/<estado>` |
-| Inventario de piezas    | `GET /api/piezas`    | `GET /api/piezas/<idPieza>`       | `POST /api/piezas`    | `PUT /api/piezas/<idPieza>`    | `DELETE /api/piezas/<idPieza>` |
-| Proveedores             | `GET /api/proveedores` | `GET /api/proveedores/<idProveedor>` | `POST /api/proveedores` | `PUT /api/proveedores/<idProveedor>` | `DELETE /api/proveedores/<idProveedor>` |
-| Movimientos             | `GET /api/movimientos` | `GET /api/movimientos/<idMovimiento>` | `POST /api/movimientos` | `PUT /api/movimientos/<idMovimiento>` | `DELETE /api/movimientos/<idMovimiento>` |
-| Fábrica / Producción    | `GET /api/fabricacion/plan/<codigo>?cantidad=100` | - | `POST /api/fabricacion/producciones` para producir lotes usando piezas internas / `POST /api/fabricacion/calcular_piezas` para obtener el requerimiento de piezas | - | - |
-| Documentación API       | - | - | UI en `/docs` (OpenAPI `/openapi.json`) | - | - |
-| Proveedores ↔ Fábrica   | - | - | `POST /api/proveedores/solicitudes` para reabastecer una pieza (`id_pieza`, `cantidad`) | - | - |
+| Componente | Tecnología | Puerto | Propósito |
+|------------|------------|--------|-----------|
+| **API** | FastAPI + Uvicorn | 5050 | Endpoints REST |
+| **Worker** | RQ (Redis Queue) | - | Procesamiento asíncrono |
+| **Cola** | Redis 7 | 6379 | Broker de mensajes |
+| **Base de datos** | PostgreSQL 15 | 5434 (HOST_POSTGRES_PORT) | Persistencia |
 
-### Inventarios gestionados
-- **Inventario de productos terminados**: contiene los estados `Disponible`, `Reservado` y `A Despacho` por cada código (`S1`, `S2`). VENTAS consume `reservas`/`despachos`, DESPACHO confirma entregas y FÁBRICA agrega stock terminado (ya sea de forma automática cuando se cruza el umbral de 500 unidades o manualmente mediante `POST /api/fabricacion/producciones`).
-- **Inventario de piezas**: almacena los insumos que necesita FÁBRICA para ensamblar los productos. Cada pieza está ligada a un proveedor, lo que permite estimar tiempos de reabastecimiento cuando se requiere producir. El endpoint `GET /api/fabricacion/plan/<codigo>` devuelve la lista de piezas que se consumirían junto con el stock disponible por pieza.
-  - Se incluyen por defecto seis piezas (`P1` … `P6`), cada una vinculada a un proveedor (`Prov1` … `Prov6`). Esto permite simular todo el flujo de abastecimiento desde la semilla inicial.
+## 🚀 Quick Start
 
-### Ejemplos de carga útil
-`POST /api/productos/ingresos` (el campo `estado` es opcional, por defecto `Disponible`)
-```json
-{
-  "id_producto": "S1",
-  "cantidad": 250
-}
+### 1. Levantar Servicios
+
+```bash
+# Clonar repositorio
+git clone <repo_url>
+cd Proyecto-Infraestructuras-Inventario
+
+# Copiar variables de entorno
+cp .env.example .env
+
+# Levantar todo con Docker Compose
+# Si tienes otro Postgres ocupando el puerto, ajusta HOST_POSTGRES_PORT en .env
+docker compose up --build
 ```
 
-`POST /api/productos/transferencias`
-```json
+### 2. Inicializar Base de Datos
+
+```bash
+# Crear tablas
+docker compose exec api python -m app.cli create-db
+
+# Cargar datos de ejemplo
+docker compose exec api python -m app.cli seed-db
+```
+
+### 3. Probar Endpoints
+
+```bash
+# Health check
+curl http://localhost:5050/health
+
+# Listar productos
+curl http://localhost:5050/api/productos
+
+# Listar piezas
+curl http://localhost:5050/api/piezas
+
+# Documentación interactiva
+open http://localhost:5050/docs
+```
+
+## 📊 Arquitectura
+
+```
+┌─────────────┐   HTTP    ┌──────────┐
+│   Cliente   │ ────────► │   API    │
+└─────────────┘           │ FastAPI  │
+                          └────┬─────┘
+                               │
+                    ┌──────────┼──────────┐
+                    │          │          │
+                    ▼          ▼          ▼
+              ┌─────────┐ ┌────────┐ ┌────────┐
+              │  Redis  │ │ Worker │ │Postgres│
+              │  Queue  │ │   RQ   │ │   DB   │
+              └─────────┘ └────────┘ └────────┘
+```
+
+**Flujo asíncrono:**
+1. Cliente → API: Request HTTP
+2. API → Redis: Encolar trabajo
+3. API → Cliente: Respuesta rápida (202 Accepted)
+4. Worker → Redis: Consumir trabajo
+5. Worker → PostgreSQL: Actualizar datos
+
+> 📖 **Más detalles:** [01_ARQUITECTURA_GENERAL.md](01_ARQUITECTURA_GENERAL.md)
+
+## 📦 Recursos Principales
+
+### Inventario de Productos
+
+**Productos:** `S1`, `S2`  
+**Estados:** `Disponible`, `Reservado`, `A Despacho`
+
+**Endpoints clave:**
+```bash
+# Listar todos los productos
+GET /api/productos
+
+# Ver estados de un producto
+GET /api/productos/S1
+
+# Ver un estado específico
+GET /api/productos/S1/Disponible
+
+# Transferir entre estados
+POST /api/productos/transferencias
 {
   "id_producto": "S1",
   "estado_origen": "Disponible",
   "estado_destino": "Reservado",
   "cantidad": 50
 }
-```
 
-`POST /api/fabricacion/calcular_piezas`
-```json
+# Ingresar stock (aumentar cantidad)
+POST /api/productos/ingresos
 {
   "codigo": "S1",
-  "cantidad": 120
+  "cantidad": 100,
+  "estado": "Disponible"
 }
-```
 
-`POST /api/movimientos`
-```json
+# Reservar stock (VENTAS)
+POST /api/productos/reservas
 {
-  "id_movimiento": 5,
-  "id_objeto": 2,
-  "tipo_objeto": "pieza",
-  "cantidad": 12,
-  "direccion": "entrada"
+  "id_producto": "S1",
+  "cantidad": 50
+}
+
+# Despachar productos
+POST /api/productos/despachos
+{
+  "id_producto": "S1",
+  "cantidad": 50
 }
 ```
 
-## Flujo de inventario de productos
-- Solo existen dos códigos (`S1` y `S2`) y tres estados posibles por código (`Reservado`, `A Despacho`, `Disponible`). La tabla `inventario_productos` contiene un registro por combinación código-estado.
-- Las cantidades se ajustan moviendo stock entre estados mediante `POST /api/productos/transferencias`. Se debe indicar `id_producto`, `estado_origen`, `estado_destino` y `cantidad` (entero positivo). El servicio valida que exista stock suficiente en el origen antes de concretar la transferencia.
-- Si necesitas corregir manualmente un estado específico puedes usar `PUT /api/productos/<codigo>/<estado>` con `{"cantidad": X}`.
+### Inventario de Piezas
 
-### Evento VENTAS → INVENTARIO (reservas)
-Cuando el microservicio de VENTAS necesita confirmar disponibilidad:
-1. Envía `POST /api/productos/reservas` con `{"id_producto": "S1", "cantidad": 15}`.
-2. INVENTARIO intenta mover desde `Disponible` hacia `Reservado` la cantidad solicitada (operación temporal que prepara la siguiente etapa del flujo).
-3. La respuesta es:
-   ```json
-   {
-     "id_producto": "S1",
-     "cantidad_solicitada": 15,
-     "cantidad_confirmada": 15,
-     "cantidad_pendiente": 0,
-     "cantidad_disponible": 85,
-     "tiempo_estimado": 0,
-     "estado_ingreso": "Reservado",
-     "fabricado": false,
-      "reservado": true
-   }
-   ```
-   - `estado_ingreso` indica el estado al que se movieron los productos (`Reservado` si salieron del stock disponible, `A Despacho` si se fabricaron específicamente para el pedido). 
-   - `fabricado: true` aparece cuando INVENTARIO tuvo que coordinar con FÁBRICA porque no había disponibilidad inmediata; en ese caso la respuesta mostrará `estado_ingreso: "A Despacho"`.
+**Piezas:** `P1`, `P2`, `P3`, `P4`, `P5`, `P6`  
+Cada pieza está vinculada a un proveedor.
 
-### Evento VENTAS → INVENTARIO (despachos)
-Cuando el cliente confirma la compra:
-1. VENTAS envía `POST /api/productos/despachos` con `{"id_producto": "S1", "cantidad": 10}`.
-2. INVENTARIO mueve la cantidad desde `Reservado` hacia `A Despacho` (stock listo para salir).
-3. La respuesta es:
-   ```json
-   {
-     "id_producto": "S1",
-     "cantidad_solicitada": 10,
-     "cantidad_confirmada": 10,
-     "cantidad_pendiente": 0,
-     "cantidad_disponible": 80,
-     "tiempo_estimado": 0,
-     "estado_ingreso": "A Despacho",
-     "despachado": true
-   }
-   ```
-   - `despachado: true` confirma que el traslado a `A Despacho` fue exitoso.
-   - Si había menos unidades reservadas, INVENTARIO solicita fabricación adicional al microservicio de FÁBRICA. El lote resultante ingresa directamente como `A Despacho`, y `tiempo_estimado` refleja la suma entre el reabastecimiento de piezas y el tiempo de producción.
-
-### Evento INVENTARIO ↔ FÁBRICA
-Para evitar que el stock disponible caiga por debajo de los umbrales operativos, INVENTARIO monitorea `Disponible` y se coordina con FÁBRICA y PROVEEDORES:
-1. Si el estado `Disponible` de un producto baja de 500 unidades, se solicita automáticamente a FÁBRICA la producción de lotes de 500 unidades hasta alcanzar al menos 1000.
-2. FÁBRICA responde con el plan de piezas y el tiempo de producción. INVENTARIO verifica la existencia de las piezas (`inventario_piezas`). Si faltan, se solicitan a PROVEEDORES (tomando el tiempo de entrega registrado).
-3. Una vez aseguradas las piezas, se descuentan del inventario de materiales, FÁBRICA produce y se incrementa el estado `Disponible`.
-4. Cuando la fabricación se realiza por solicitud directa de VENTAS (por falta de stock o reserva), los productos ingresan como `A Despacho` para distinguirlos de los lotes producidos para reabastecimiento general. El tiempo total estimado (`tiempo_estimado`) que aparece en las respuestas de reservas/despachos incorpora la suma del reabastecimiento de piezas más el tiempo de producción, permitiendo a VENTAS anticipar promesas de entrega incluso cuando inicialmente no había stock suficiente.
-
-- **Planificación manual**: usando `GET /api/fabricacion/plan/<codigo>?cantidad=100`, FÁBRICA puede consultar qué piezas requiere y cuánto tiempo tomará producir un lote. 
-- **Producción manual**: `POST /api/fabricacion/producciones` permite registrar un lote producido (por defecto ingresa como Disponible, pero las solicitudes derivadas de VENTAS diferencian automáticamente el estado final).
-
-## Variables de entorno principales
-- `DATABASE_URL`: Cadena de conexión SQLAlchemy usada por Flask.
-- `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`: Credenciales del contenedor PostgreSQL.
-- `FLASK_ENV`: Selecciona la configuración (`development`, `production`, `testing`).
-- `FABRICA_BASE_URL`: (opcional) URL base del servicio de Fábrica para consultar `GET /fabricacion/planos/{plano_id}`. Si se define, el tiempo de fabricación se tomará de ese endpoint (mapping por defecto: S1→1, S2→2); si no responde, se usa el plan local.
-
-## Comandos útiles
+**Endpoints clave:**
 ```bash
-# Levantar servicios
+# Listar piezas
+GET /api/piezas
+
+# Crear pieza
+POST /api/piezas
+{
+  "id_pieza": 7,
+  "nombre": "Motor",
+  "cantidad": 100,
+  "id_proveedor": 1
+}
+
+# Actualizar pieza
+PUT /api/piezas/7
+{
+  "cantidad": 150
+}
+
+# Eliminar pieza
+DELETE /api/piezas/7
+```
+
+### Proveedores
+
+**Proveedores:** `Prov1` a `Prov6`  
+Cada proveedor tiene un tiempo de entrega.
+
+**Endpoints clave:**
+```bash
+# Listar proveedores
+GET /api/proveedores
+
+# Solicitud síncrona (respuesta inmediata)
+POST /api/proveedores/solicitudes
+{
+  "id_pieza": 1,
+  "cantidad": 100
+}
+
+# Solicitud asíncrona (procesamiento en background)
+POST /api/proveedores/solicitudes_async
+{
+  "id_pieza": 1,
+  "cantidad": 100
+}
+# Respuesta: {"id": 5, "estado": "pendiente"}
+
+# Consultar estado de solicitud async
+GET /api/proveedores/solicitudes_async/5
+# Respuesta: {"id": 5, "estado": "completada", ...}
+```
+
+### Órdenes de Fabricación
+
+Coordina producción de productos consumiendo piezas del inventario.
+
+**Endpoints clave:**
+```bash
+# Crear orden de fabricación
+POST /api/fabricacion/ordenes
+{
+  "id_producto": "S1",
+  "cantidad": 100
+}
+# Respuesta: {"id": 25, "estado": "confirmado", "tiempo_estimado": 9}
+
+# Listar órdenes
+GET /api/fabricacion/ordenes
+
+# Ver orden específica
+GET /api/fabricacion/ordenes/25
+
+# Calcular piezas necesarias
+POST /api/fabricacion/calcular_piezas
+{
+  "codigo": "S1",
+  "cantidad": 100
+}
+
+# Consultar plan de fabricación
+GET /api/fabricacion/plan/S1?cantidad=100
+```
+
+## 🔄 Sistema de Colas (Redis + RQ)
+
+El sistema utiliza **workers asíncronos** para procesar tareas pesadas sin bloquear la API.
+
+### Workers Disponibles
+
+1. **procesar_solicitud_pieza**: Simula pedido a proveedor
+2. **procesar_orden_fabricacion**: Consume piezas de órdenes confirmadas
+
+### Ejemplo: Solicitud Asíncrona
+
+```bash
+# 1. Cliente solicita piezas (API responde inmediatamente)
+curl -X POST http://localhost:5050/api/proveedores/solicitudes_async \
+  -H "Content-Type: application/json" \
+  -d '{"id_pieza": 1, "cantidad": 100}'
+
+# Respuesta en ~50ms:
+# {"id": 5, "estado": "pendiente", "tiempo_estimado": 0}
+
+# 2. Worker procesa en background (5 segundos)
+# [WORKER] Procesando solicitud #5
+# [WORKER] Incrementando pieza #1: +100 unidades
+# [WORKER] Solicitud #5 completada ✓
+
+# 3. Cliente consulta estado
+curl http://localhost:5050/api/proveedores/solicitudes_async/5
+
+# Respuesta:
+# {"id": 5, "id_pieza": 1, "cantidad": 100, "estado": "completada"}
+```
+
+**Ventajas:**
+- ✅ API responde en ~50ms (no espera worker)
+- ✅ Workers procesan en paralelo
+- ✅ Escalabilidad horizontal
+
+> 📖 **Más detalles:** [02_SISTEMA_COLAS.md](02_SISTEMA_COLAS.md)
+
+## ⚡ Paralelismo y Concurrencia
+
+### API + Workers en Paralelo
+
+```
+Timeline de Ejecución:
+
+API      │ Request 1 │ Request 2 │ Request 3 │
+         │  (50ms)   │  (50ms)   │  (50ms)   │
+         └─enqueue───┴─enqueue───┴─enqueue───
+
+Worker1  │═══════ Solicitud #1 (5s) ═══════│
+Worker2         │═══════ Solicitud #2 (5s) ═══════│
+Worker3                │═══ Orden #3 (3s) ═══│
+```
+
+**API y Workers ejecutan simultáneamente** sin bloquearse mutuamente.
+
+### Escalado Horizontal
+
+```yaml
+# docker-compose.yml
+services:
+  worker:
+    deploy:
+      replicas: 10  # 10 workers procesando en paralelo
+```
+
+**Resultado:** Throughput 10x mayor
+
+> 📖 **Más detalles:** [03_PARALELISMO_CONCURRENCIA.md](03_PARALELISMO_CONCURRENCIA.md)
+
+## 📋 Flujos de Negocio
+
+### Flujo 1: Solicitud de Pieza Asíncrona
+```
+Usuario → API → Redis → Worker → Actualiza inventario
+   ↓ (inmediato)         ↓ (background)
+Respuesta 202
+```
+
+### Flujo 2: Orden de Fabricación
+```
+Usuario → API → Calcular piezas → Solicitar faltantes →
+          Confirmar fábrica → Encolar worker →
+          Worker consume piezas → Espera productos
+```
+
+### Flujo 3: Ingreso de Productos
+```
+Productos listos → API → Incrementa inventario →
+                   Completa órdenes pendientes automáticamente
+```
+
+> 📖 **Más detalles:** [04_FLUJOS_INVENTARIO.md](04_FLUJOS_INVENTARIO.md)
+
+## 🛠️ Comandos Útiles
+
+### Desarrollo
+
+```bash
+# Logs en tiempo real
+docker compose logs -f api
+docker compose logs -f worker
+
+# Reiniciar servicios
+docker compose restart api worker
+
+# Rebuild después de cambios
 docker compose up --build
-# Ejecutar pruebas de salud
-docker compose exec api curl http://localhost:5000/health
-# Reconstruir base de datos (ojo: elimina datos)
-docker compose down -v && docker compose up --build
+
+# Ejecutar tests
+docker compose exec api pytest tests/ -v
 ```
 
-## Pruebas automatizadas
-Para ejecutar la batería de pruebas (usa la configuración `testing` con SQLite en memoria):
+### Base de Datos
+
 ```bash
-pip install -r requirements-dev.txt
-pytest
+# Conectar a PostgreSQL
+docker compose exec db psql -U postgres -d inventarios_db
+
+# Recrear BD (⚠️ elimina datos)
+docker compose exec api python -m app.cli create-db
+
+# Hacer backup
+docker compose exec db pg_dump -U postgres inventarios_db > backup.sql
 ```
 
-## Documentación interactiva
-- UI: `http://localhost:5050/docs` (o la IP de Tailscale si accedes de forma remota).
-- Especificación JSON: `http://localhost:5050/openapi.json`.
+### Redis/Colas
 
-Con esto tienes un microservicio listo para extender lógica de negocio, agregar validaciones avanzadas o nuevos endpoints (PUT/PATCH) manteniendo la separación MVC.
+```bash
+# Conectar a Redis
+docker compose exec redis redis-cli
+
+# Ver trabajos en cola
+> LLEN rq:queue:default
+
+# Ver workers activos
+> SMEMBERS rq:workers
+```
+
+## 📁 Estructura del Proyecto
+
+```
+app/
+├── api/                # Controllers FastAPI
+│   ├── inventario_productos_controller.py
+│   ├── inventario_piezas_controller.py
+│   ├── proveedores_controller.py
+│   ├── movimientos_controller.py
+│   └── fabricacion_controller.py
+├── services/           # Lógica de negocio (por dominio)
+│   ├── inventario/     # Productos, piezas, movimientos
+│   ├── fabricacion/    # Órdenes, planes, entregas
+│   └── proveedores/    # Proveedores, solicitudes
+├── repositories/       # Acceso a datos (CRUD)
+├── models/             # Modelos SQLAlchemy
+├── schemas/            # Modelos Pydantic (validación)
+├── domain/             # Lógica pura (constantes, normalizadores)
+├── core/               # Utilidades transversales
+├── data/seed/          # Datos de ejemplo (JSON)
+├── tasks.py            # Workers RQ
+├── database.py         # Configuración SQLAlchemy
+└── routes.py           # Registro de routers
+```
+
+## 🧪 Testing
+
+```bash
+# Ejecutar todos los tests
+docker compose exec api pytest
+
+# Ejecutar con verbosity
+docker compose exec api pytest -v
+
+# Ejecutar test específico
+docker compose exec api pytest tests/test_productos.py
+
+# Ver coverage
+docker compose exec api pytest --cov=app tests/
+```
+
+> 📖 **Más detalles:** [TESTING.md](TESTING.md)
+
+## 📚 Documentación
+
+| Documento | Descripción |
+|-----------|-------------|
+| [00_INDICE.md](00_INDICE.md) | 🗺️ Índice de documentación |
+| [01_ARQUITECTURA_GENERAL.md](01_ARQUITECTURA_GENERAL.md) | 🏗️ Arquitectura completa |
+| [02_SISTEMA_COLAS.md](02_SISTEMA_COLAS.md) | 🔄 Redis + RQ en detalle |
+| [03_PARALELISMO_CONCURRENCIA.md](03_PARALELISMO_CONCURRENCIA.md) | ⚡ Concurrencia y escalado |
+| [04_FLUJOS_INVENTARIO.md](04_FLUJOS_INVENTARIO.md) | 📊 Diagramas de flujos |
+| [05_GUIA_DESARROLLO.md](05_GUIA_DESARROLLO.md) | 🛠️ Cómo extender el sistema |
+| [TESTING.md](TESTING.md) | 🧪 Guía de pruebas |
+
+## 🌐 Variables de Entorno
+
+```bash
+# .env
+DATABASE_URL=postgresql+psycopg://postgres:postgres@db:5432/inventarios_db
+REDIS_URL=redis://redis:6379/0
+POSTGRES_DB=inventarios_db
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+```
+
+## 🎯 Próximos Pasos
+
+### Nuevo en el Proyecto
+1. Lee [00_INDICE.md](00_INDICE.md) - Guía de navegación
+2. Lee [01_ARQUITECTURA_GENERAL.md](01_ARQUITECTURA_GENERAL.md) - Entiende el sistema
+3. Lee [02_SISTEMA_COLAS.md](02_SISTEMA_COLAS.md) - Aprende colas
+4. Prueba los endpoints con `curl` o desde `/docs`
+
+### Listo para Desarrollar
+1. Lee [05_GUIA_DESARROLLO.md](05_GUIA_DESARROLLO.md) - Patrones y ejemplos
+2. Explora el código en `app/`
+3. Ejecuta los tests: `pytest`
+4. ¡Crea tu primera funcionalidad!
 
 ---
 
-## 🏭 Integración con Fábrica Externa
-
-Este proyecto integra con un servicio de fabricación externa en AWS:
-- **URL Fábrica:** `http://ec2-98-93-67-35.compute-1.amazonaws.com:8555`
-- **Documentación:** http://ec2-98-93-67-35.compute-1.amazonaws.com:8555/docs
-
-### Flujo de Fabricación Asíncrona
-
-1. **Crear orden:** `POST /api/fabricacion/ordenes` con `{"id_producto": "S1", "cantidad": 100}`
-2. **Confirmación:** La fábrica externa confirma la orden (estado: `"confirmado"`)
-3. **Fabricación:** Worker procesa la orden en background
-4. **Webhook:** La fábrica envía productos terminados automáticamente
-5. **Actualización:** Inventario y órdenes se actualizan automáticamente
-
-### Endpoints de Webhook
-
-La fábrica externa puede enviar productos terminados a:
-- **Principal:** `POST /api/productos/ingresos`
-- **Alternativo:** `POST /api/fabricacion/webhook/productos_terminados`
-
-Ambos endpoints:
-- ✅ Incrementan inventario automáticamente
-- ✅ Completan órdenes pendientes
-- ✅ Manejan entregas parciales
-
-### Comandos CLI Adicionales
-
-```bash
-# Probar conexión con fábrica externa
-sudo docker compose exec api python -m app.cli test-fabrica
-
-# Resetear inventario a cero (útil para pruebas)
-sudo docker compose exec api python -m app.cli reset-inventory
-
-# Ver estado de integración
-curl http://localhost:5050/api/fabricacion/external/status | python -m json.tool
-```
-
-### 📚 Documentación Detallada
-
-- **[QUICKFIX.md](QUICKFIX.md)** ⚡ **¡EMPIEZA AQUÍ!** - Solución rápida en 1 minuto
-- **[CONFIGURACION_COMPLETA.md](CONFIGURACION_COMPLETA.md)** 🔧 **Guía completa de configuración**
-  - Incluye configuración de AMBOS lados (fábrica + inventario)
-  - 3 opciones: Tailscale, VPC AWS, IP Pública
-  - Troubleshooting detallado
-  - Pruebas de integración paso a paso
-- **[RESUMEN_EJECUTIVO.md](RESUMEN_EJECUTIVO.md)** - Resumen del estado actual
-- **[SOLUCION_WEBHOOK.md](SOLUCION_WEBHOOK.md)** - Análisis técnico del webhook
-- **[ARQUITECTURA_WEBHOOK.md](ARQUITECTURA_WEBHOOK.md)** - Diagramas y arquitectura
-- **[WEBHOOK_STATUS.md](WEBHOOK_STATUS.md)** - Estado completo del sistema
-- **[TESTING.md](TESTING.md)** - Guía de pruebas y ejemplos
-- **[test_fabrica.py](test_fabrica.py)** - Script de pruebas automatizadas
-
-### ⚙️ Configuración del Webhook
-
-**IMPORTANTE:** Para que la fábrica externa pueda enviar webhooks automáticamente:
-
-**Lado de la Fábrica (AWS):**
-1. Configurar la IP correcta en `fabricacion-api/compose.yaml` línea 31
-2. Reiniciar el servicio: `docker compose restart api`
-
-**Tu Lado (Inventario):**
-1. Asegurar que tu servicio es accesible (puerto 5050)
-2. Configurar firewall/security groups
-3. Elegir método de conectividad (Tailscale recomendado)
-
-Ver **[CONFIGURACION_COMPLETA.md](CONFIGURACION_COMPLETA.md)** para instrucciones paso a paso de ambos lados.
+**Desarrollado con ❤️ usando FastAPI, Redis, RQ y PostgreSQL**

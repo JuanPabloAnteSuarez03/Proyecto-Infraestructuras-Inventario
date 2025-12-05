@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Microservicio de Inventarios - Sistema de Inventario</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        
+:root {
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --secondary: #8b5cf6;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --dark: #1e293b;
+    --gray: #64748b;
+    --light: #f1f5f9;
+    --white: #ffffff;
+    --border: #e2e8f0;
+    --code-bg: #282c34;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: var(--light);
+    color: var(--dark);
+    line-height: 1.7;
+}
+
+.navbar {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.nav-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-brand {
+    color: var(--white);
+    font-size: 1.25rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.nav-links {
+    display: flex;
+    gap: 24px;
+}
+
+.nav-links a {
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s;
+}
+
+.nav-links a:hover {
+    color: var(--white);
+}
+
+.container {
+    max-width: 1400px;
+    margin: 40px auto;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 40px;
+    padding: 0 24px;
+}
+
+.sidebar {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 24px;
+    height: fit-content;
+    position: sticky;
+    top: 100px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.sidebar h3 {
+    color: var(--dark);
+    font-size: 1.1rem;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--primary);
+}
+
+.sidebar-menu {
+    list-style: none;
+}
+
+.sidebar-menu li {
+    margin-bottom: 8px;
+}
+
+.sidebar-menu a {
+    display: block;
+    padding: 10px 12px;
+    color: var(--gray);
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.3s;
+    font-size: 0.95rem;
+}
+
+.sidebar-menu a:hover {
+    background: var(--primary);
+    color: var(--white);
+    transform: translateX(4px);
+}
+
+.content {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 40px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    min-height: 600px;
+}
+
+.content h1 {
+    color: var(--dark);
+    font-size: 2.5rem;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 3px solid var(--primary);
+}
+
+.content h2 {
+    color: var(--dark);
+    font-size: 2rem;
+    margin-top: 40px;
+    margin-bottom: 20px;
+    padding-left: 12px;
+    border-left: 4px solid var(--primary);
+}
+
+.content h3 {
+    color: var(--dark);
+    font-size: 1.5rem;
+    margin-top: 32px;
+    margin-bottom: 16px;
+}
+
+.content p {
+    margin-bottom: 16px;
+    color: var(--gray);
+}
+
+.content ul, .content ol {
+    margin: 16px 0 16px 24px;
+    color: var(--gray);
+}
+
+.content li {
+    margin-bottom: 8px;
+}
+
+.content a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.content a:hover {
+    text-decoration: underline;
+}
+
+.content code {
+    font-family: 'Fira Code', monospace;
+    background: var(--light);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: var(--danger);
+}
+
+.content pre {
+    background: var(--code-bg);
+    border-radius: 8px;
+    padding: 20px;
+    overflow-x: auto;
+    margin: 20px 0;
+}
+
+.content pre code {
+    background: none;
+    color: #abb2bf;
+    padding: 0;
+}
+
+.content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+}
+
+.content th {
+    background: var(--primary);
+    color: var(--white);
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+}
+
+.content td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.content tr:hover {
+    background: var(--light);
+}
+
+.content blockquote {
+    border-left: 4px solid var(--primary);
+    padding: 16px 20px;
+    margin: 20px 0;
+    background: var(--light);
+    border-radius: 0 8px 8px 0;
+}
+
+.footer {
+    text-align: center;
+    padding: 40px 24px;
+    color: var(--gray);
+}
+
+.footer a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+@media (max-width: 1024px) {
+    .container {
+        grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+        position: relative;
+        top: 0;
+    }
+}
+
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="../index.html" class="nav-brand">📚 Documentación Inventario</a>
+            <div class="nav-links">
+                <a href="../index.html">🏠 Inicio</a>
+                <a href="00_indice.html">📑 Índice</a>
+                <a href="https://github.com" target="_blank">💻 GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <aside class="sidebar">
+            <h3>📖 Navegación</h3>
+            <ul class="sidebar-menu">
+                <li><a href="00_indice.html">🗺️ Índice</a></li>
+                <li><a href="01_arquitectura.html">🏗️ Arquitectura</a></li>
+                <li><a href="02_sistema_colas.html">🔄 Sistema de Colas</a></li>
+                <li><a href="03_paralelismo.html">⚡ Paralelismo</a></li>
+                <li><a href="04_flujos.html">📊 Flujos</a></li>
+                <li><a href="05_guia_desarrollo.html">🛠️ Desarrollo</a></li>
+                <li><a href="readme.html">📖 README</a></li>
+                <li><a href="testing.html">🧪 Testing</a></li>
+            </ul>
+        </aside>
+
+        <main class="content">
+            <h1>Microservicio de Inventarios</h1>
+
+<p>Sistema de gestión de inventarios construido con <strong>FastAPI</strong>, <strong>Redis</strong>, <strong>RQ</strong> y <strong>PostgreSQL</strong>. Utiliza <strong>procesamiento asíncrono</strong> mediante colas de trabajo para manejar operaciones que requieren tiempo sin bloquear la API.</p>
+
+<p>> 📚 <strong>Documentación completa:</strong> Ver <a href="00_INDICE.md">00_INDICE.md</a> para guías detalladas</p>
+
+<h2>🌟 Características</h2>
+
+<ul>
+<li>✅ <strong>API REST</strong> con FastAPI (endpoints JSON)</li>
+<li>✅ <strong>Procesamiento asíncrono</strong> con Redis + RQ</li>
+<li>✅ <strong>Gestión de inventario</strong> de productos y piezas</li>
+<li>✅ <strong>Órdenes de fabricación</strong> con consumo automático de piezas  </li>
+<li>✅ <strong>Solicitudes a proveedores</strong> síncronas y asíncronas</li>
+<li>✅ <strong>Multi-estado de productos</strong> (Disponible, Reservado, A Despacho)</li>
+<li>✅ <strong>Escalabilidad horizontal</strong> (workers paralelos)</li>
+<li>✅ <strong>Docker Compose</strong> para desarrollo local</li>
+</ul>
+
+<h2>🏗️ Stack Tecnológico</h2>
+
+<p>| Componente | Tecnología | Puerto | Propósito |</p>
+<p>|------------|------------|--------|-----------|</p>
+<p>| <strong>API</strong> | FastAPI + Uvicorn | 5050 | Endpoints REST |</p>
+<p>| <strong>Worker</strong> | RQ (Redis Queue) | - | Procesamiento asíncrono |</p>
+<p>| <strong>Cola</strong> | Redis 7 | 6379 | Broker de mensajes |</p>
+<p>| <strong>Base de datos</strong> | PostgreSQL 15 | 5434 (HOST_POSTGRES_PORT) | Persistencia |</p>
+
+<h2>🚀 Quick Start</h2>
+
+<h3>1. Levantar Servicios</h3>
+
+<pre><code class="language-bash"><h1>Clonar repositorio</h1>
+git clone <repo_url>
+cd Proyecto-Infraestructuras-Inventario
+
+<h1>Copiar variables de entorno</h1>
+cp .env.example .env
+
+<h1>Levantar todo con Docker Compose</h1>
+# Si tienes otro Postgres ocupando el puerto, ajusta HOST_POSTGRES_PORT en .env
+docker compose up --build</code></pre>
+
+<h3>2. Inicializar Base de Datos</h3>
+
+<pre><code class="language-bash"><h1>Crear tablas</h1>
+docker compose exec api python -m app.cli create-db
+
+<h1>Cargar datos de ejemplo</h1>
+docker compose exec api python -m app.cli seed-db</code></pre>
+
+<h3>3. Probar Endpoints</h3>
+
+<pre><code class="language-bash"><h1>Health check</h1>
+curl http://localhost:5050/health
+
+<h1>Listar productos</h1>
+curl http://localhost:5050/api/productos
+
+<h1>Listar piezas</h1>
+curl http://localhost:5050/api/piezas
+
+<h1>Documentación interactiva</h1>
+open http://localhost:5050/docs</code></pre>
+
+<h2>📊 Arquitectura</h2>
+
+<pre><code class="language-">┌─────────────┐   HTTP    ┌──────────┐
+│   Cliente   │ ────────► │   API    │
+└─────────────┘           │ FastAPI  │
+                          └────┬─────┘
+                               │
+                    ┌──────────┼──────────┐
+                    │          │          │
+                    ▼          ▼          ▼
+              ┌─────────┐ ┌────────┐ ┌────────┐
+              │  Redis  │ │ Worker │ │Postgres│
+              │  Queue  │ │   RQ   │ │   DB   │
+              └─────────┘ └────────┘ └────────┘</code></pre>
+
+<strong>Flujo asíncrono:</strong>
+<p>1. Cliente → API: Request HTTP</p>
+<p>2. API → Redis: Encolar trabajo</p>
+<p>3. API → Cliente: Respuesta rápida (202 Accepted)</p>
+<p>4. Worker → Redis: Consumir trabajo</p>
+<p>5. Worker → PostgreSQL: Actualizar datos</p>
+
+<p>> 📖 <strong>Más detalles:</strong> <a href="01_ARQUITECTURA_GENERAL.md">01_ARQUITECTURA_GENERAL.md</a></p>
+
+<h2>📦 Recursos Principales</h2>
+
+<h3>Inventario de Productos</h3>
+
+<strong>Productos:</strong> <code>S1</code>, <code>S2</code>  
+<strong>Estados:</strong> <code>Disponible</code>, <code>Reservado</code>, <code>A Despacho</code>
+
+<strong>Endpoints clave:</strong>
+<pre><code class="language-bash"><h1>Listar todos los productos</h1>
+GET /api/productos
+
+<h1>Ver estados de un producto</h1>
+GET /api/productos/S1
+
+<h1>Ver un estado específico</h1>
+GET /api/productos/S1/Disponible
+
+<h1>Transferir entre estados</h1>
+POST /api/productos/transferencias
+{
+  "id_producto": "S1",
+  "estado_origen": "Disponible",
+  "estado_destino": "Reservado",
+  "cantidad": 50
+}
+
+<h1>Ingresar stock (aumentar cantidad)</h1>
+POST /api/productos/ingresos
+{
+  "codigo": "S1",
+  "cantidad": 100,
+  "estado": "Disponible"
+}
+
+<h1>Reservar stock (VENTAS)</h1>
+POST /api/productos/reservas
+{
+  "id_producto": "S1",
+  "cantidad": 50
+}
+
+<h1>Despachar productos</h1>
+POST /api/productos/despachos
+{
+  "id_producto": "S1",
+  "cantidad": 50
+}</code></pre>
+
+<h3>Inventario de Piezas</h3>
+
+<strong>Piezas:</strong> <code>P1</code>, <code>P2</code>, <code>P3</code>, <code>P4</code>, <code>P5</code>, <code>P6</code>  
+<p>Cada pieza está vinculada a un proveedor.</p>
+
+<strong>Endpoints clave:</strong>
+<pre><code class="language-bash"><h1>Listar piezas</h1>
+GET /api/piezas
+
+<h1>Crear pieza</h1>
+POST /api/piezas
+{
+  "id_pieza": 7,
+  "nombre": "Motor",
+  "cantidad": 100,
+  "id_proveedor": 1
+}
+
+<h1>Actualizar pieza</h1>
+PUT /api/piezas/7
+{
+  "cantidad": 150
+}
+
+<h1>Eliminar pieza</h1>
+DELETE /api/piezas/7</code></pre>
+
+<h3>Proveedores</h3>
+
+<strong>Proveedores:</strong> <code>Prov1</code> a <code>Prov6</code>  
+<p>Cada proveedor tiene un tiempo de entrega.</p>
+
+<strong>Endpoints clave:</strong>
+<pre><code class="language-bash"><h1>Listar proveedores</h1>
+GET /api/proveedores
+
+<h1>Solicitud síncrona (respuesta inmediata)</h1>
+POST /api/proveedores/solicitudes
+{
+  "id_pieza": 1,
+  "cantidad": 100
+}
+
+<h1>Solicitud asíncrona (procesamiento en background)</h1>
+POST /api/proveedores/solicitudes_async
+{
+  "id_pieza": 1,
+  "cantidad": 100
+}
+<h1>Respuesta: {"id": 5, "estado": "pendiente"}</h1>
+
+<h1>Consultar estado de solicitud async</h1>
+GET /api/proveedores/solicitudes_async/5
+<h1>Respuesta: {"id": 5, "estado": "completada", ...}</h1></code></pre>
+
+<h3>Órdenes de Fabricación</h3>
+
+<p>Coordina producción de productos consumiendo piezas del inventario.</p>
+
+<strong>Endpoints clave:</strong>
+<pre><code class="language-bash"><h1>Crear orden de fabricación</h1>
+POST /api/fabricacion/ordenes
+{
+  "id_producto": "S1",
+  "cantidad": 100
+}
+<h1>Respuesta: {"id": 25, "estado": "confirmado", "tiempo_estimado": 9}</h1>
+
+<h1>Listar órdenes</h1>
+GET /api/fabricacion/ordenes
+
+<h1>Ver orden específica</h1>
+GET /api/fabricacion/ordenes/25
+
+<h1>Calcular piezas necesarias</h1>
+POST /api/fabricacion/calcular_piezas
+{
+  "codigo": "S1",
+  "cantidad": 100
+}
+
+<h1>Consultar plan de fabricación</h1>
+GET /api/fabricacion/plan/S1?cantidad=100</code></pre>
+
+<h2>🔄 Sistema de Colas (Redis + RQ)</h2>
+
+<p>El sistema utiliza <strong>workers asíncronos</strong> para procesar tareas pesadas sin bloquear la API.</p>
+
+<h3>Workers Disponibles</h3>
+
+<p>1. <strong>procesar_solicitud_pieza</strong>: Simula pedido a proveedor</p>
+<p>2. <strong>procesar_orden_fabricacion</strong>: Consume piezas de órdenes confirmadas</p>
+
+<h3>Ejemplo: Solicitud Asíncrona</h3>
+
+<pre><code class="language-bash"><h1>1. Cliente solicita piezas (API responde inmediatamente)</h1>
+curl -X POST http://localhost:5050/api/proveedores/solicitudes_async \
+  -H "Content-Type: application/json" \
+  -d '{"id_pieza": 1, "cantidad": 100}'
+
+<h1>Respuesta en ~50ms:</h1>
+<h1>{"id": 5, "estado": "pendiente", "tiempo_estimado": 0}</h1>
+
+<h1>2. Worker procesa en background (5 segundos)</h1>
+<h1>[WORKER] Procesando solicitud #5</h1>
+<h1>[WORKER] Incrementando pieza #1: +100 unidades</h1>
+<h1>[WORKER] Solicitud #5 completada ✓</h1>
+
+<h1>3. Cliente consulta estado</h1>
+curl http://localhost:5050/api/proveedores/solicitudes_async/5
+
+<h1>Respuesta:</h1>
+<h1>{"id": 5, "id_pieza": 1, "cantidad": 100, "estado": "completada"}</h1></code></pre>
+
+<strong>Ventajas:</strong>
+<ul>
+<li>✅ API responde en ~50ms (no espera worker)</li>
+<li>✅ Workers procesan en paralelo</li>
+<li>✅ Escalabilidad horizontal</li>
+</ul>
+
+<p>> 📖 <strong>Más detalles:</strong> <a href="02_SISTEMA_COLAS.md">02_SISTEMA_COLAS.md</a></p>
+
+<h2>⚡ Paralelismo y Concurrencia</h2>
+
+<h3>API + Workers en Paralelo</h3>
+
+<pre><code class="language-">Timeline de Ejecución:
+
+API      │ Request 1 │ Request 2 │ Request 3 │
+         │  (50ms)   │  (50ms)   │  (50ms)   │
+         └─enqueue───┴─enqueue───┴─enqueue───
+
+Worker1  │═══════ Solicitud #1 (5s) ═══════│
+Worker2         │═══════ Solicitud #2 (5s) ═══════│
+Worker3                │═══ Orden #3 (3s) ═══│</code></pre>
+
+<strong>API y Workers ejecutan simultáneamente</strong> sin bloquearse mutuamente.
+
+<h3>Escalado Horizontal</h3>
+
+<pre><code class="language-yaml"><h1>docker-compose.yml</h1>
+services:
+  worker:
+    deploy:
+      replicas: 10  # 10 workers procesando en paralelo</code></pre>
+
+<strong>Resultado:</strong> Throughput 10x mayor
+
+<p>> 📖 <strong>Más detalles:</strong> <a href="03_PARALELISMO_CONCURRENCIA.md">03_PARALELISMO_CONCURRENCIA.md</a></p>
+
+<h2>📋 Flujos de Negocio</h2>
+
+<h3>Flujo 1: Solicitud de Pieza Asíncrona</h3>
+<pre><code class="language-">Usuario → API → Redis → Worker → Actualiza inventario
+   ↓ (inmediato)         ↓ (background)
+Respuesta 202</code></pre>
+
+<h3>Flujo 2: Orden de Fabricación</h3>
+<pre><code class="language-">Usuario → API → Calcular piezas → Solicitar faltantes →
+          Confirmar fábrica → Encolar worker →
+          Worker consume piezas → Espera productos</code></pre>
+
+<h3>Flujo 3: Ingreso de Productos</h3>
+<pre><code class="language-">Productos listos → API → Incrementa inventario →
+                   Completa órdenes pendientes automáticamente</code></pre>
+
+<p>> 📖 <strong>Más detalles:</strong> <a href="04_FLUJOS_INVENTARIO.md">04_FLUJOS_INVENTARIO.md</a></p>
+
+<h2>🛠️ Comandos Útiles</h2>
+
+<h3>Desarrollo</h3>
+
+<pre><code class="language-bash"><h1>Logs en tiempo real</h1>
+docker compose logs -f api
+docker compose logs -f worker
+
+<h1>Reiniciar servicios</h1>
+docker compose restart api worker
+
+<h1>Rebuild después de cambios</h1>
+docker compose up --build
+
+<h1>Ejecutar tests</h1>
+docker compose exec api pytest tests/ -v</code></pre>
+
+<h3>Base de Datos</h3>
+
+<pre><code class="language-bash"><h1>Conectar a PostgreSQL</h1>
+docker compose exec db psql -U postgres -d inventarios_db
+
+<h1>Recrear BD (⚠️ elimina datos)</h1>
+docker compose exec api python -m app.cli create-db
+
+<h1>Hacer backup</h1>
+docker compose exec db pg_dump -U postgres inventarios_db > backup.sql</code></pre>
+
+<h3>Redis/Colas</h3>
+
+<pre><code class="language-bash"><h1>Conectar a Redis</h1>
+docker compose exec redis redis-cli
+
+<h1>Ver trabajos en cola</h1>
+<blockquote>LLEN rq:queue:default</blockquote>
+
+<h1>Ver workers activos</h1>
+<blockquote>SMEMBERS rq:workers</code></pre></blockquote>
+
+<h2>📁 Estructura del Proyecto</h2>
+
+<pre><code class="language-">app/
+├── api/                # Controllers FastAPI
+│   ├── inventario_productos_controller.py
+│   ├── inventario_piezas_controller.py
+│   ├── proveedores_controller.py
+│   ├── movimientos_controller.py
+│   └── fabricacion_controller.py
+├── services/           # Lógica de negocio (por dominio)
+│   ├── inventario/     # Productos, piezas, movimientos
+│   ├── fabricacion/    # Órdenes, planes, entregas
+│   └── proveedores/    # Proveedores, solicitudes
+├── repositories/       # Acceso a datos (CRUD)
+├── models/             # Modelos SQLAlchemy
+├── schemas/            # Modelos Pydantic (validación)
+├── domain/             # Lógica pura (constantes, normalizadores)
+├── core/               # Utilidades transversales
+├── data/seed/          # Datos de ejemplo (JSON)
+├── tasks.py            # Workers RQ
+├── database.py         # Configuración SQLAlchemy
+└── routes.py           # Registro de routers</code></pre>
+
+<h2>🧪 Testing</h2>
+
+<pre><code class="language-bash"><h1>Ejecutar todos los tests</h1>
+docker compose exec api pytest
+
+<h1>Ejecutar con verbosity</h1>
+docker compose exec api pytest -v
+
+<h1>Ejecutar test específico</h1>
+docker compose exec api pytest tests/test_productos.py
+
+<h1>Ver coverage</h1>
+docker compose exec api pytest --cov=app tests/</code></pre>
+
+<p>> 📖 <strong>Más detalles:</strong> <a href="TESTING.md">TESTING.md</a></p>
+
+<h2>📚 Documentación</h2>
+
+<p>| Documento | Descripción |</p>
+<p>|-----------|-------------|</p>
+<p>| <a href="00_INDICE.md">00_INDICE.md</a> | 🗺️ Índice de documentación |</p>
+<p>| <a href="01_ARQUITECTURA_GENERAL.md">01_ARQUITECTURA_GENERAL.md</a> | 🏗️ Arquitectura completa |</p>
+<p>| <a href="02_SISTEMA_COLAS.md">02_SISTEMA_COLAS.md</a> | 🔄 Redis + RQ en detalle |</p>
+<p>| <a href="03_PARALELISMO_CONCURRENCIA.md">03_PARALELISMO_CONCURRENCIA.md</a> | ⚡ Concurrencia y escalado |</p>
+<p>| <a href="04_FLUJOS_INVENTARIO.md">04_FLUJOS_INVENTARIO.md</a> | 📊 Diagramas de flujos |</p>
+<p>| <a href="05_GUIA_DESARROLLO.md">05_GUIA_DESARROLLO.md</a> | 🛠️ Cómo extender el sistema |</p>
+<p>| <a href="TESTING.md">TESTING.md</a> | 🧪 Guía de pruebas |</p>
+
+<h2>🌐 Variables de Entorno</h2>
+
+<pre><code class="language-bash"><h1>.env</h1>
+DATABASE_URL=postgresql+psycopg://postgres:postgres@db:5432/inventarios_db
+REDIS_URL=redis://redis:6379/0
+POSTGRES_DB=inventarios_db
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres</code></pre>
+
+<h2>🎯 Próximos Pasos</h2>
+
+<h3>Nuevo en el Proyecto</h3>
+<p>1. Lee <a href="00_INDICE.md">00_INDICE.md</a> - Guía de navegación</p>
+<p>2. Lee <a href="01_ARQUITECTURA_GENERAL.md">01_ARQUITECTURA_GENERAL.md</a> - Entiende el sistema</p>
+<p>3. Lee <a href="02_SISTEMA_COLAS.md">02_SISTEMA_COLAS.md</a> - Aprende colas</p>
+<p>4. Prueba los endpoints con <code>curl</code> o desde <code>/docs</code></p>
+
+<h3>Listo para Desarrollar</h3>
+<p>1. Lee <a href="05_GUIA_DESARROLLO.md">05_GUIA_DESARROLLO.md</a> - Patrones y ejemplos</p>
+<p>2. Explora el código en <code>app/</code></p>
+<p>3. Ejecuta los tests: <code>pytest</code></p>
+<p>4. ¡Crea tu primera funcionalidad!</p>
+
+<p>---</p>
+
+<strong>Desarrollado con ❤️ usando FastAPI, Redis, RQ y PostgreSQL</strong>
+
+
+        </main>
+    </div>
+
+    <footer class="footer">
+        <p>Desarrollado con ❤️ usando FastAPI, Redis, RQ y PostgreSQL</p>
+        <p><a href="../index.html">← Volver al índice</a></p>
+    </footer>
+
+    <script>
+        hljs.highlightAll();
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</body>
+</html>

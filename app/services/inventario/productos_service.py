@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 from typing import Any
 from sqlalchemy.orm import Session
 from app.repositories import (
@@ -10,6 +11,7 @@ from app.domain import normalize_estado, normalize_producto_codigo
 from app.services.inventario.productos_manufacturing_helper import (
     ProductosManufacturingHelper,
 )
+from app.services.fabricacion.fabricacion_orchestrator import FabricacionOrchestrator
 
 
 class InventarioProductosService:
@@ -58,6 +60,7 @@ class InventarioProductosService:
         self.stock_minimo = 500
         self.stock_objetivo = 1000
         self.lote_produccion = 500
+        self.log = logging.getLogger(self.__class__.__name__)
 
     # === CRUD Operations ===
 
@@ -378,6 +381,15 @@ class InventarioProductosService:
             respuesta["tiempo_estimado"], auto_info["tiempo_estimado"]
         )
 
+        if auto_info.get("accion") == "fabricar":
+            self.log.info(
+                "[AUTO_STOCK] Stock bajo en %s: disponible=%s, se fabricará lote de reposición (tiempo=%s min)",
+                codigo,
+                disponible_actual.cantidad if disponible_actual else 0,
+                auto_info["tiempo_estimado"],
+            )
+            self._encolar_reposicion(codigo, auto_info.get("cantidad_reponer", 0))
+
         if respuesta["cantidad_pendiente"] == 0:
             respuesta["tiempo_estimado"] = 0
 
@@ -450,6 +462,15 @@ class InventarioProductosService:
             respuesta["tiempo_estimado"], auto_info["tiempo_estimado"]
         )
 
+        if auto_info.get("accion") == "fabricar":
+            self.log.info(
+                "[AUTO_STOCK] Stock bajo en %s durante despacho: disponible=%s, se fabricará lote de reposición (tiempo=%s min)",
+                codigo,
+                respuesta["cantidad_disponible"],
+                auto_info["tiempo_estimado"],
+            )
+            self._encolar_reposicion(codigo, auto_info.get("cantidad_reponer", 0))
+
         if respuesta["cantidad_pendiente"] == 0:
             respuesta["tiempo_estimado"] = 0
 
@@ -518,6 +539,35 @@ class InventarioProductosService:
             stock_objetivo=self.stock_objetivo,
             lote_produccion=self.lote_produccion,
         )
+
+    def _encolar_reposicion(self, codigo: str, cantidad: int) -> None:
+        """
+        Encola una orden de fabricación para reponer stock mínimo.
+
+        Si la cantidad es <= 0 o si ocurre un error, solo se loguea para diagnóstico
+        sin interrumpir la operación original de reserva/despacho.
+        """
+        if cantidad <= 0:
+            return
+        try:
+            orchestrator = FabricacionOrchestrator(
+                session=self.session,
+                fabricacion_service=self.manufacturing_helper.fabricacion_service,
+            )
+            resultado = orchestrator.crear_orden(codigo, cantidad)
+            self.log.info(
+                "[AUTO_STOCK] Orden de reposición encolada: producto=%s, cantidad=%s, estado=%s",
+                codigo,
+                cantidad,
+                resultado.get("estado"),
+            )
+        except Exception as exc:
+            self.log.warning(
+                "[AUTO_STOCK] No se pudo encolar reposición automática para %s x%s: %s",
+                codigo,
+                cantidad,
+                exc,
+            )
 
     def _normalize_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         """Normaliza códigos de producto y estado en el payload."""

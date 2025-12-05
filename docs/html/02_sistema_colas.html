@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔄 Sistema de Colas (Redis + RQ) - Sistema de Inventario</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        
+:root {
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --secondary: #8b5cf6;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --dark: #1e293b;
+    --gray: #64748b;
+    --light: #f1f5f9;
+    --white: #ffffff;
+    --border: #e2e8f0;
+    --code-bg: #282c34;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: var(--light);
+    color: var(--dark);
+    line-height: 1.7;
+}
+
+.navbar {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.nav-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-brand {
+    color: var(--white);
+    font-size: 1.25rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.nav-links {
+    display: flex;
+    gap: 24px;
+}
+
+.nav-links a {
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s;
+}
+
+.nav-links a:hover {
+    color: var(--white);
+}
+
+.container {
+    max-width: 1400px;
+    margin: 40px auto;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 40px;
+    padding: 0 24px;
+}
+
+.sidebar {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 24px;
+    height: fit-content;
+    position: sticky;
+    top: 100px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.sidebar h3 {
+    color: var(--dark);
+    font-size: 1.1rem;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--primary);
+}
+
+.sidebar-menu {
+    list-style: none;
+}
+
+.sidebar-menu li {
+    margin-bottom: 8px;
+}
+
+.sidebar-menu a {
+    display: block;
+    padding: 10px 12px;
+    color: var(--gray);
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.3s;
+    font-size: 0.95rem;
+}
+
+.sidebar-menu a:hover {
+    background: var(--primary);
+    color: var(--white);
+    transform: translateX(4px);
+}
+
+.content {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 40px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    min-height: 600px;
+}
+
+.content h1 {
+    color: var(--dark);
+    font-size: 2.5rem;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 3px solid var(--primary);
+}
+
+.content h2 {
+    color: var(--dark);
+    font-size: 2rem;
+    margin-top: 40px;
+    margin-bottom: 20px;
+    padding-left: 12px;
+    border-left: 4px solid var(--primary);
+}
+
+.content h3 {
+    color: var(--dark);
+    font-size: 1.5rem;
+    margin-top: 32px;
+    margin-bottom: 16px;
+}
+
+.content p {
+    margin-bottom: 16px;
+    color: var(--gray);
+}
+
+.content ul, .content ol {
+    margin: 16px 0 16px 24px;
+    color: var(--gray);
+}
+
+.content li {
+    margin-bottom: 8px;
+}
+
+.content a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.content a:hover {
+    text-decoration: underline;
+}
+
+.content code {
+    font-family: 'Fira Code', monospace;
+    background: var(--light);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: var(--danger);
+}
+
+.content pre {
+    background: var(--code-bg);
+    border-radius: 8px;
+    padding: 20px;
+    overflow-x: auto;
+    margin: 20px 0;
+}
+
+.content pre code {
+    background: none;
+    color: #abb2bf;
+    padding: 0;
+}
+
+.content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+}
+
+.content th {
+    background: var(--primary);
+    color: var(--white);
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+}
+
+.content td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.content tr:hover {
+    background: var(--light);
+}
+
+.content blockquote {
+    border-left: 4px solid var(--primary);
+    padding: 16px 20px;
+    margin: 20px 0;
+    background: var(--light);
+    border-radius: 0 8px 8px 0;
+}
+
+.footer {
+    text-align: center;
+    padding: 40px 24px;
+    color: var(--gray);
+}
+
+.footer a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+@media (max-width: 1024px) {
+    .container {
+        grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+        position: relative;
+        top: 0;
+    }
+}
+
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="../index.html" class="nav-brand">📚 Documentación Inventario</a>
+            <div class="nav-links">
+                <a href="../index.html">🏠 Inicio</a>
+                <a href="00_indice.html">📑 Índice</a>
+                <a href="https://github.com" target="_blank">💻 GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <aside class="sidebar">
+            <h3>📖 Navegación</h3>
+            <ul class="sidebar-menu">
+                <li><a href="00_indice.html">🗺️ Índice</a></li>
+                <li><a href="01_arquitectura.html">🏗️ Arquitectura</a></li>
+                <li><a href="02_sistema_colas.html">🔄 Sistema de Colas</a></li>
+                <li><a href="03_paralelismo.html">⚡ Paralelismo</a></li>
+                <li><a href="04_flujos.html">📊 Flujos</a></li>
+                <li><a href="05_guia_desarrollo.html">🛠️ Desarrollo</a></li>
+                <li><a href="readme.html">📖 README</a></li>
+                <li><a href="testing.html">🧪 Testing</a></li>
+            </ul>
+        </aside>
+
+        <main class="content">
+            <h1>🔄 Sistema de Colas (Redis + RQ)</h1>
+
+<h2>Introducción</h2>
+
+<p>El sistema utiliza <strong>colas de trabajo</strong> para procesar tareas que requieren tiempo sin bloquear la API. Esto permite que la API responda inmediatamente mientras los workers procesan las tareas en background.</p>
+
+<h2>¿Por qué usar colas?</h2>
+
+<h3>Problema sin colas</h3>
+
+<pre><code class="language-python">@router.post("/proveedores/solicitudes")
+def solicitar_piezas(pieza_id, cantidad):
+    # Simular pedido a proveedor (5 segundos)
+    time.sleep(5)  # ❌ API bloqueada 5 segundos
+    pieza.cantidad += cantidad
+    return {"mensaje": "Pieza solicitada"}</code></pre>
+
+<strong>Consecuencias:</strong>
+<ul>
+<li>❌ Cliente espera 5 segundos</li>
+<li>❌ API no puede atender otros requests</li>
+<li>❌ No escalable (1 request lento bloquea todo)</li>
+</ul>
+
+<h3>Solución con colas</h3>
+
+<pre><code class="language-python">@router.post("/proveedores/solicitudes_async")
+def solicitar_piezas_async(pieza_id, cantidad):
+    solicitud = crear_solicitud(pieza_id, cantidad)
+    queue.enqueue(procesar_solicitud_pieza, solicitud.id)
+    return {"id": solicitud.id, "estado": "pendiente"}  # ✅ Respuesta inmediata</code></pre>
+
+<strong>Beneficios:</strong>
+<ul>
+<li>✅ API responde en ~50ms</li>
+<li>✅ Worker procesa en background</li>
+<li>✅ Cliente puede consultar estado después</li>
+<li>✅ Sistema escalable</li>
+</ul>
+
+<h2>¿Qué es RQ?</h2>
+
+<strong>RQ (Redis Queue)</strong> es una biblioteca Python para ejecutar trabajos (jobs) en background usando Redis como broker.
+
+<h3>Componentes:</h3>
+
+<p>1. <strong>Producer (Productor)</strong>: Código que encola trabajos → <strong>API FastAPI</strong></p>
+<p>2. <strong>Queue (Cola)</strong>: Almacena trabajos pendientes → <strong>Redis</strong></p>
+<p>3. <strong>Consumer (Consumidor)</strong>: Procesa trabajos → <strong>Worker RQ</strong></p>
+<p>4. <strong>Job (Trabajo)</strong>: Función Python + argumentos</p>
+
+<pre><code class="language-">Producer → Queue → Consumer
+  (API)    (Redis)  (Worker)</code></pre>
+
+<h2>Arquitectura del Sistema de Colas</h2>
+
+<pre><code class="language-mermaid">sequenceDiagram
+    participant Client as Cliente
+    participant API as API FastAPI
+    participant Redis as Cola Redis
+    participant Worker as Worker RQ
+    participant DB as PostgreSQL
+
+    Client->>API: POST /api/proveedores/solicitudes_async
+    API->>DB: Crear solicitud (estado: pendiente)
+    DB-->>API: Solicitud creada (id: 1)
+    API->>Redis: Encolar trabajo procesar_solicitud_pieza(1)
+    API-->>Client: {"id": 1, "estado": "pendiente"} ✅ Rápido
+    
+    Note over Worker: Worker monitorea cola...
+    Redis-->>Worker: Trabajo disponible
+    Worker->>DB: Actualizar solicitud (estado: en_proceso)
+    Worker->>Worker: Simular pedido (time.sleep)
+    Worker->>DB: Incrementar pieza.cantidad
+    Worker->>DB: Actualizar solicitud (estado: completada)
+    
+    Note over Client: Cliente puede consultar estado
+    Client->>API: GET /api/proveedores/solicitudes_async/1
+    API->>DB: Buscar solicitud
+    DB-->>API: {"id": 1, "estado": "completada"}
+    API-->>Client: Estado actualizado</code></pre>
+
+<h2>Configuración en Docker Compose</h2>
+
+<h3>docker-compose.yml</h3>
+
+<pre><code class="language-yaml">services:
+  # API: Produce trabajos
+  api:
+    build: .
+    command: uvicorn main:app --host 0.0.0.0 --port 5000
+    ports:
+      - "5050:5000"
+    depends_on:
+      - redis
+
+  # Worker: Consume trabajos
+  worker:
+    build: .
+    command: rq worker --url redis://redis:6379/0 default
+    depends_on:
+      - redis
+      - api
+
+  # Redis: Cola de mensajes
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"</code></pre>
+
+<strong>Puntos clave:</strong>
+<ul>
+<li><code>api</code> y <code>worker</code> usan la misma imagen (mismo código)</li>
+<li><code>worker</code> ejecuta comando <code>rq worker</code> en lugar de <code>uvicorn</code></li>
+<li>Ambos se conectan a Redis en <code>redis://redis:6379/0</code></li>
+<li>Cola: <code>default</code></li>
+</ul>
+
+<h2>Implementación en el Proyecto</h2>
+
+<h3>1. Configuración de Redis y Cola</h3>
+
+<strong>Archivo:</strong> <code>app/tasks.py</code>
+
+<pre><code class="language-python">import redis
+from rq import Queue
+
+<h1>Conexión a Redis</h1>
+redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+redis_conn = redis.from_url(redis_url)
+
+<h1>Cola default</h1>
+queue = Queue(connection=redis_conn)</code></pre>
+
+<h3>2. Definición de Workers</h3>
+
+<strong>Archivo:</strong> <code>app/tasks.py</code>
+
+<h4>Worker 1: Procesar Solicitud de Pieza</h4>
+
+<pre><code class="language-python">def procesar_solicitud_pieza(solicitud_id: int) -> None:
+    """
+    Worker que simula pedido a proveedor y actualiza inventario.
+    
+    Flujo:
+    1. Cambiar estado a "en_proceso"
+    2. Obtener tiempo de entrega del proveedor
+    3. Simular espera (time.sleep)
+    4. Incrementar cantidad de pieza
+    5. Cambiar estado a "completada"
+    """
+    session = _ensure_session()
+    try:
+        # 1. Obtener solicitud
+        solicitudes_service = SolicitudesPiezaService(session)
+        solicitud = solicitudes_service.retrieve(solicitud_id)
+        
+        # 2. Cambiar a "en_proceso"
+        solicitud.estado = "en_proceso"
+        session.commit()
+        
+        # 3. Obtener tiempo de proveedor
+        pieza = piezas_service.retrieve(solicitud.id_pieza)
+        proveedor = proveedores_service.retrieve(pieza.id_proveedor)
+        tiempo = proveedor.tiempo
+        solicitud.tiempo_estimado = tiempo
+        session.commit()
+        
+        # 4. Simular pedido (máx 1 segundo para testing)
+        time.sleep(min(tiempo, 1))
+        
+        # 5. Actualizar inventario
+        pieza.cantidad += solicitud.cantidad
+        solicitud.estado = "completada"
+        session.commit()
+    finally:
+        session.close()</code></pre>
+
+<h4>Worker 2: Procesar Orden de Fabricación</h4>
+
+<pre><code class="language-python">def procesar_orden_fabricacion(orden_id: int) -> None:
+    """
+    Worker que consume piezas después de confirmación con fábrica.
+    
+    Flujo:
+    1. Verificar que orden esté "confirmado"
+    2. Cambiar estado a "consumiendo_piezas"
+    3. Obtener plan de materiales
+    4. Consumir cada pieza del inventario
+    5. Cambiar estado a "esperando_fabricacion"
+    """
+    session = _ensure_session()
+    try:
+        ordenes_service = OrdenesFabricacionService(session)
+        orden = ordenes_service.retrieve(orden_id)
+        
+        # 1. Validar estado
+        if orden.estado == "confirmado":
+            # 2. Cambiar estado
+            orden.estado = "consumiendo_piezas"
+            session.commit()
+            
+            # 3. Obtener plan
+            plan = fabricacion_service.solicitar_plan(
+                orden.id_producto, orden.cantidad
+            )
+            
+            # 4. Consumir piezas
+            for material in plan.materiales:
+                pieza = piezas_repo.get_by_id(material["id_pieza"])
+                if pieza:
+                    pieza.cantidad -= material["cantidad"]
+                    print(f"[WORKER] Consumido {material['cantidad']} x {material['id_pieza']}")
+            
+            session.commit()
+            
+            # 5. Esperar productos de fábrica
+            orden.estado = "esperando_fabricacion"
+            session.commit()
+            print(f"[WORKER] ⏳ Esperando productos de fábrica")
+    except Exception as exc:
+        orden.estado = "fallida"
+        orden.detalle = {"error": str(exc)}
+        session.commit()
+    finally:
+        session.close()</code></pre>
+
+<h3>3. Encolar Trabajos desde la API</h3>
+
+<h4>Ejemplo 1: Solicitud de Pieza Asíncrona</h4>
+
+<strong>Archivo:</strong> <code>app/api/proveedores_controller.py</code>
+
+<pre><code class="language-python">from app.tasks import queue, procesar_solicitud_pieza
+
+@router.post("/solicitudes_async", status_code=202)
+def solicitar_piezas_async(body: SolicitudPiezaAsync, db: Session = Depends(get_db)):
+    # 1. Crear registro en DB
+    solicitudes_service = SolicitudesPiezaService(db)
+    solicitud = solicitudes_service.create({
+        "id_pieza": body.id_pieza,
+        "cantidad": body.cantidad,
+        "estado": "pendiente"
+    })
+    
+    # 2. Encolar trabajo
+    queue.enqueue(procesar_solicitud_pieza, solicitud.id)
+    
+    # 3. Responder inmediatamente
+    return {
+        "id": solicitud.id,
+        "estado": solicitud.estado,
+        "tiempo_estimado": solicitud.tiempo_estimado
+    }</code></pre>
+
+<strong>HTTP Status:</strong> <code>202 Accepted</code> indica procesamiento asíncrono.
+
+<h4>Ejemplo 2: Orden de Fabricación</h4>
+
+<strong>Archivo:</strong> <code>app/services/fabricacion/fabricacion_orchestrator.py</code>
+
+<pre><code class="language-python">from app.tasks import queue, procesar_orden_fabricacion
+
+class FabricacionOrchestrator:
+    def crear_orden(self, codigo: str, cantidad: int) -> dict:
+        # ... (calcular piezas, solicitar proveedores)
+        
+        # Confirmar con fábrica externa
+        confirmacion = self.fabricacion_service.confirmar_fabricacion_externa(
+            codigo, cantidad
+        )
+        
+        if confirmacion and confirmacion.get("status") == "ok":
+            orden.estado = "confirmado"
+            session.commit()
+            
+            # Encolar worker para consumir piezas
+            queue.enqueue(procesar_orden_fabricacion, orden.id)
+            
+            return {"id": orden.id, "estado": "confirmado"}</code></pre>
+
+<h2>Ciclo de Vida de un Trabajo</h2>
+
+<h3>Estados de un Job en RQ</h3>
+
+<pre><code class="language-">Enqueued → Started → Finished
+  (Cola)    (Worker)  (Exitoso)
+                ↓
+             Failed
+           (Con error)</code></pre>
+
+<h3>Estados de Solicitud en nuestra DB</h3>
+
+<pre><code class="language-">pendiente → en_proceso → completada
+                      ↘ fallida</code></pre>
+
+<strong>Sincronización:</strong>
+<ul>
+<li>RQ maneja estado del job (enqueued/started/finished)</li>
+<li>Nuestra app maneja estado del negocio (pendiente/en_proceso/completada)</li>
+</ul>
+
+<h2>Ejemplo Completo: Solicitud Asíncrona</h2>
+
+<h3>1. Cliente hace request</h3>
+
+<pre><code class="language-bash">curl -X POST http://localhost:5050/api/proveedores/solicitudes_async \
+  -H "Content-Type: application/json" \
+  -d '{"id_pieza": 1, "cantidad": 100}'</code></pre>
+
+<h3>2. API responde inmediatamente</h3>
+
+<pre><code class="language-json">{
+  "id": 5,
+  "estado": "pendiente",
+  "tiempo_estimado": 0
+}</code></pre>
+
+<strong>Tiempo:</strong> ~50ms
+
+<h3>3. Worker procesa en background</h3>
+
+<pre><code class="language-">[WORKER] Procesando solicitud #5
+[WORKER] Cambiando estado a "en_proceso"
+[WORKER] Tiempo de proveedor: 5 minutos
+[WORKER] Simulando pedido... (esperando 1 seg)
+[WORKER] Incrementando pieza #1: +100 unidades
+[WORKER] Solicitud #5 completada ✓</code></pre>
+
+<strong>Tiempo:</strong> ~1-5 segundos (dependiendo del proveedor)
+
+<h3>4. Cliente consulta estado</h3>
+
+<pre><code class="language-bash">curl http://localhost:5050/api/proveedores/solicitudes_async/5</code></pre>
+
+<pre><code class="language-json">{
+  "id": 5,
+  "id_pieza": 1,
+  "cantidad": 100,
+  "estado": "completada",
+  "tiempo_estimado": 5
+}</code></pre>
+
+<h2>Monitoreo de Colas</h2>
+
+<h3>Ver trabajos en cola (Redis CLI)</h3>
+
+<pre><code class="language-bash"><h1>Entrar al contenedor Redis</h1>
+docker compose exec redis redis-cli
+
+<h1>Ver cantidad de trabajos en cola</h1>
+<blockquote>LLEN rq:queue:default</blockquote>
+(integer) 3
+
+<h1>Ver trabajos encolados</h1>
+<blockquote>LRANGE rq:queue:default 0 -1</blockquote>
+
+<h1>Ver keys relacionadas a RQ</h1>
+<blockquote>KEYS rq:*</blockquote>
+1) "rq:queue:default"
+2) "rq:job:abc123"
+3) "rq:workers"</code></pre>
+
+<h3>Ver logs de workers</h3>
+
+<pre><code class="language-bash"><h1>Logs en tiempo real</h1>
+docker compose logs -f worker
+
+<h1>Filtrar por worker</h1>
+docker compose logs -f worker | grep WORKER
+
+<h1>Últimos 50 logs</h1>
+docker compose logs --tail=50 worker</code></pre>
+
+<h3>Inspeccionar estado de trabajos en Python</h3>
+
+<pre><code class="language-python">from rq import Queue
+from rq.job import Job
+import redis
+
+redis_conn = redis.from_url("redis://redis:6379/0")
+queue = Queue(connection=redis_conn)
+
+<h1>Ver trabajos en cola</h1>
+jobs = queue.jobs
+print(f"Trabajos en cola: {len(jobs)}")
+
+<h1>Ver detalles de un job</h1>
+job = Job.fetch('job_id', connection=redis_conn)
+print(f"Estado: {job.get_status()}")
+print(f"Resultado: {job.result}")</code></pre>
+
+<h2>Escalabilidad de Workers</h2>
+
+<h3>Escalar horizontalmente</h3>
+
+<pre><code class="language-yaml"><h1>docker-compose.yml</h1>
+services:
+  worker:
+    build: .
+    command: rq worker --url redis://redis:6379/0 default
+    deploy:
+      replicas: 5  # 5 workers en paralelo</code></pre>
+
+<strong>Ventajas:</strong>
+<ul>
+<li>5 solicitudes procesadas simultáneamente</li>
+<li>Throughput 5x mayor</li>
+<li>Tolerancia a fallos (un worker cae, otros siguen)</li>
+</ul>
+
+<h3>Ver workers activos</h3>
+
+<pre><code class="language-bash">docker compose exec redis redis-cli
+
+<blockquote>SMEMBERS rq:workers</blockquote>
+1) "rq:worker:abc-123"
+2) "rq:worker:def-456"
+3) "rq:worker:ghi-789"</code></pre>
+
+<h2>Gestión de Errores</h2>
+
+<h3>En el Worker</h3>
+
+<pre><code class="language-python">def procesar_solicitud_pieza(solicitud_id: int) -> None:
+    session = _ensure_session()
+    try:
+        # Procesamiento normal
+        solicitud.estado = "completada"
+        session.commit()
+    except Exception as exc:
+        # Marcar como fallida
+        solicitud.estado = "fallida"
+        solicitud.detalle = {"error": str(exc)}
+        session.commit()
+        # Re-raise para que RQ registre el fallo
+        raise
+    finally:
+        session.close()</code></pre>
+
+<h3>Reintentos en RQ</h3>
+
+<pre><code class="language-python"><h1>Encolar con reintentos</h1>
+queue.enqueue(
+    procesar_solicitud_pieza,
+    solicitud.id,
+    retry=Retry(max=3, interval=[10, 30, 60])  # 3 reintentos
+)</code></pre>
+
+<h2>Comparación: Síncrono vs Asíncrono</h2>
+
+<p>| Característica | Síncrono | Asíncrono (con cola) |</p>
+<p>|----------------|----------|----------------------|</p>
+<p>| <strong>Endpoint</strong> | <code>/proveedores/solicitudes</code> | <code>/proveedores/solicitudes_async</code> |</p>
+<p>| <strong>Tiempo de respuesta</strong> | 5+ segundos | ~50ms |</p>
+<p>| <strong>Procesamiento</strong> | Inmediato | En background |</p>
+<p>| <strong>Estado final</strong> | En la respuesta | Consultar después |</p>
+<p>| <strong>Escalabilidad</strong> | Limitada | Alta |</p>
+<p>| <strong>Complejidad</strong> | Baja | Media |</p>
+<p>| <strong>Uso recomendado</strong> | Operaciones rápidas | Operaciones lentas |</p>
+
+<h2>Buenas Prácticas</h2>
+
+<h3>✅ DO</h3>
+
+<p>1. <strong>Usar colas para tareas lentas</strong></p>
+<p>   ``<code>python</p>
+<p>   # Tarea que toma 5+ segundos</p>
+<p>   queue.enqueue(procesar_solicitud_pieza, solicitud_id)</p>
+<p>   </code>`<code></p>
+
+<p>2. <strong>Registrar estado antes de encolar</strong></p>
+<p>   </code>`<code>python</p>
+<p>   solicitud = crear_solicitud(...)  # Estado: "pendiente"</p>
+<p>   queue.enqueue(procesar_solicitud_pieza, solicitud.id)</p>
+<p>   </code>`<code></p>
+
+<p>3. <strong>Manejar errores en workers</strong></p>
+<p>   </code>`<code>python</p>
+<p>   try:</p>
+<p>       # Procesamiento</p>
+<p>   except Exception:</p>
+<p>       marcar_como_fallida()</p>
+<p>       raise</p>
+<p>   </code>`<code></p>
+
+<p>4. <strong>Cerrar sesiones de DB</strong></p>
+<p>   </code>`<code>python</p>
+<p>   try:</p>
+<p>       # Usar sesión</p>
+<p>   finally:</p>
+<p>       session.close()</p>
+<p>   </code>`<code></p>
+
+<h3>❌ DON'T</h3>
+
+<p>1. <strong>No usar colas para tareas rápidas</strong></p>
+<p>   </code>`<code>python</p>
+<p>   # ❌ Overhead innecesario</p>
+<p>   queue.enqueue(sumar, 1, 2)</p>
+<p>   </code>`<code></p>
+
+<p>2. <strong>No bloquear el worker</strong></p>
+<p>   </code>`<code>python</p>
+<p>   # ❌ Worker bloqueado indefinidamente</p>
+<p>   while True:</p>
+<p>       time.sleep(1)</p>
+<p>   </code>`<code></p>
+
+<p>3. <strong>No compartir sesiones entre API y Worker</strong></p>
+<p>   </code>`<code>python</p>
+<p>   # ❌ Sesión de API no es válida en Worker</p>
+<p>   queue.enqueue(funcion, session=db)</p>
+<p>   </code>`<code></p>
+
+<p>4. <strong>No asumir orden de ejecución</strong></p>
+<p>   </code>`<code>python</p>
+<p>   # ❌ No garantizado</p>
+<p>   queue.enqueue(tarea1, id)</p>
+<p>   queue.enqueue(tarea2, id)  # Puede ejecutarse antes que tarea1</p>
+<p>   </code>``</p>
+
+<h2>Ventajas del Sistema</h2>
+
+<h3>Para el Cliente</h3>
+<ul>
+<li>✅ Respuestas rápidas (no espera tareas lentas)</li>
+<li>✅ Puede consultar estado cuando quiera</li>
+<li>✅ Mejor experiencia de usuario</li>
+</ul>
+
+<h3>Para el Sistema</h3>
+<ul>
+<li>✅ API no bloqueada</li>
+<li>✅ Escalabilidad horizontal (agregar workers)</li>
+<li>✅ Tolerancia a fallos (reintentos)</li>
+<li>✅ Separación de responsabilidades</li>
+</ul>
+
+<h3>Para Desarrollo</h3>
+<ul>
+<li>✅ Lógica de negocio desacoplada</li>
+<li>✅ Testing más fácil (mockear colas)</li>
+<li>✅ Monitoreo independiente</li>
+</ul>
+
+<h2>Siguientes Pasos</h2>
+
+<p>Ahora que entiendes el sistema de colas:</p>
+
+<p>1. <strong>Aprende sobre concurrencia:</strong> Lee <a href="03_PARALELISMO_CONCURRENCIA.md">03_PARALELISMO_CONCURRENCIA.md</a></p>
+<p>2. <strong>Ve flujos completos:</strong> Lee <a href="04_FLUJOS_INVENTARIO.md">04_FLUJOS_INVENTARIO.md</a></p>
+<p>3. <strong>Crea tu propio worker:</strong> Lee <a href="05_GUIA_DESARROLLO.md">05_GUIA_DESARROLLO.md</a></p>
+
+        </main>
+    </div>
+
+    <footer class="footer">
+        <p>Desarrollado con ❤️ usando FastAPI, Redis, RQ y PostgreSQL</p>
+        <p><a href="../index.html">← Volver al índice</a></p>
+    </footer>
+
+    <script>
+        hljs.highlightAll();
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</body>
+</html>

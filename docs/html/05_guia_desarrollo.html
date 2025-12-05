@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🛠️ Guía de Desarrollo - Sistema de Inventario</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        
+:root {
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --secondary: #8b5cf6;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --dark: #1e293b;
+    --gray: #64748b;
+    --light: #f1f5f9;
+    --white: #ffffff;
+    --border: #e2e8f0;
+    --code-bg: #282c34;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: var(--light);
+    color: var(--dark);
+    line-height: 1.7;
+}
+
+.navbar {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.nav-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-brand {
+    color: var(--white);
+    font-size: 1.25rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.nav-links {
+    display: flex;
+    gap: 24px;
+}
+
+.nav-links a {
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s;
+}
+
+.nav-links a:hover {
+    color: var(--white);
+}
+
+.container {
+    max-width: 1400px;
+    margin: 40px auto;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 40px;
+    padding: 0 24px;
+}
+
+.sidebar {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 24px;
+    height: fit-content;
+    position: sticky;
+    top: 100px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.sidebar h3 {
+    color: var(--dark);
+    font-size: 1.1rem;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--primary);
+}
+
+.sidebar-menu {
+    list-style: none;
+}
+
+.sidebar-menu li {
+    margin-bottom: 8px;
+}
+
+.sidebar-menu a {
+    display: block;
+    padding: 10px 12px;
+    color: var(--gray);
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.3s;
+    font-size: 0.95rem;
+}
+
+.sidebar-menu a:hover {
+    background: var(--primary);
+    color: var(--white);
+    transform: translateX(4px);
+}
+
+.content {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 40px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    min-height: 600px;
+}
+
+.content h1 {
+    color: var(--dark);
+    font-size: 2.5rem;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 3px solid var(--primary);
+}
+
+.content h2 {
+    color: var(--dark);
+    font-size: 2rem;
+    margin-top: 40px;
+    margin-bottom: 20px;
+    padding-left: 12px;
+    border-left: 4px solid var(--primary);
+}
+
+.content h3 {
+    color: var(--dark);
+    font-size: 1.5rem;
+    margin-top: 32px;
+    margin-bottom: 16px;
+}
+
+.content p {
+    margin-bottom: 16px;
+    color: var(--gray);
+}
+
+.content ul, .content ol {
+    margin: 16px 0 16px 24px;
+    color: var(--gray);
+}
+
+.content li {
+    margin-bottom: 8px;
+}
+
+.content a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.content a:hover {
+    text-decoration: underline;
+}
+
+.content code {
+    font-family: 'Fira Code', monospace;
+    background: var(--light);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: var(--danger);
+}
+
+.content pre {
+    background: var(--code-bg);
+    border-radius: 8px;
+    padding: 20px;
+    overflow-x: auto;
+    margin: 20px 0;
+}
+
+.content pre code {
+    background: none;
+    color: #abb2bf;
+    padding: 0;
+}
+
+.content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+}
+
+.content th {
+    background: var(--primary);
+    color: var(--white);
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+}
+
+.content td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.content tr:hover {
+    background: var(--light);
+}
+
+.content blockquote {
+    border-left: 4px solid var(--primary);
+    padding: 16px 20px;
+    margin: 20px 0;
+    background: var(--light);
+    border-radius: 0 8px 8px 0;
+}
+
+.footer {
+    text-align: center;
+    padding: 40px 24px;
+    color: var(--gray);
+}
+
+.footer a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+@media (max-width: 1024px) {
+    .container {
+        grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+        position: relative;
+        top: 0;
+    }
+}
+
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="../index.html" class="nav-brand">📚 Documentación Inventario</a>
+            <div class="nav-links">
+                <a href="../index.html">🏠 Inicio</a>
+                <a href="00_indice.html">📑 Índice</a>
+                <a href="https://github.com" target="_blank">💻 GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <aside class="sidebar">
+            <h3>📖 Navegación</h3>
+            <ul class="sidebar-menu">
+                <li><a href="00_indice.html">🗺️ Índice</a></li>
+                <li><a href="01_arquitectura.html">🏗️ Arquitectura</a></li>
+                <li><a href="02_sistema_colas.html">🔄 Sistema de Colas</a></li>
+                <li><a href="03_paralelismo.html">⚡ Paralelismo</a></li>
+                <li><a href="04_flujos.html">📊 Flujos</a></li>
+                <li><a href="05_guia_desarrollo.html">🛠️ Desarrollo</a></li>
+                <li><a href="readme.html">📖 README</a></li>
+                <li><a href="testing.html">🧪 Testing</a></li>
+            </ul>
+        </aside>
+
+        <main class="content">
+            <h1>🛠️ Guía de Desarrollo</h1>
+
+<h2>Introducción</h2>
+
+<p>Esta guía te enseñará cómo extender el sistema de inventario agregando nuevas funcionalidades. Aprenderás patrones comunes, mejores prácticas y ejemplos prácticos.</p>
+
+<h2>Requisitos Previos</h2>
+
+<p>Antes de empezar, deberías haber leído:</p>
+<ul>
+<li><a href="01_ARQUITECTURA_GENERAL.md">01_ARQUITECTURA_GENERAL.md</a> - Entender la estructura</li>
+<li><a href="02_SISTEMA_COLAS.md">02_SISTEMA_COLAS.md</a> - Comprender RQ</li>
+<li><a href="03_PARALELISMO_CONCURRENCIA.md">03_PARALELISMO_CONCURRENCIA.md</a> - Gestión de estado</li>
+</ul>
+
+<h2>Setup de Desarrollo</h2>
+
+<h3>1. Clonar y Configurar</h3>
+
+<pre><code class="language-bash"><h1>Clonar repositorio</h1>
+git clone <repo_url>
+cd Proyecto-Infraestructuras-Inventario
+
+<h1>Copiar variables de entorno</h1>
+cp .env.example .env
+
+<h1>Levantar servicios</h1>
+docker compose up --build
+
+<h1>En otra terminal: Crear BD y cargar datos</h1>
+docker compose exec api python -m app.cli create-db
+docker compose exec api python -m app.cli seed-db</code></pre>
+
+<h3>2. Verificar Instalación</h3>
+
+<pre><code class="language-bash"><h1>Probar API</h1>
+curl http://localhost:5050/health
+<h1>Respuesta: {"status": "ok"}</h1>
+
+<h1>Probar endpoints</h1>
+curl http://localhost:5050/api/productos
+curl http://localhost:5050/api/piezas</code></pre>
+
+<h3>3. Herramientas Recomendadas</h3>
+
+<ul>
+<li><strong>IDE:</strong> VS Code, PyCharm</li>
+<li><strong>Cliente HTTP:</strong> Postman, Insomnia, curl</li>
+<li><strong>DB Client:</strong> pgAdmin, DBeaver</li>
+<li><strong>Monitoreo:</strong> Docker Desktop, <code>docker compose logs</code></li>
+</ul>
+
+<p>---</p>
+
+<h2>Patrón 1: Agregar un Nuevo Endpoint Síncrono</h2>
+
+<h3>Caso de Uso</h3>
+<p>Crear endpoint <code>GET /api/productos/{codigo}/estados</code> que retorne todos los estados de un producto.</p>
+
+<h3>Paso 1: Definir Schema Pydantic</h3>
+
+<strong>Archivo:</strong> <code>app/schemas/api_models.py</code>
+
+<pre><code class="language-python">from pydantic import BaseModel
+
+class EstadosProductoResponse(BaseModel):
+    id_producto: str
+    estados: list[dict]  # Lista de {"estado": "Disponible", "cantidad": 100}</code></pre>
+
+<h3>Paso 2: Agregar Método en Service</h3>
+
+<strong>Archivo:</strong> <code>app/services/inventario/productos_service.py</code>
+
+<pre><code class="language-python">class InventarioProductosService:
+    def listar_estados_producto(self, codigo: str) -> dict:
+        """
+        Obtiene todos los estados de un producto con sus cantidades.
+        
+        Args:
+            codigo: Código del producto (S1, S2)
+            
+        Returns:
+            Dict con id_producto y lista de estados
+        """
+        codigo = normalize_producto_codigo(codigo)
+        
+        productos = self.repository.get_all_by_codigo(codigo)
+        
+        if not productos:
+            raise ValueError(f"Producto {codigo} no encontrado")
+        
+        estados = [
+            {"estado": p.estado, "cantidad": p.cantidad}
+            for p in productos
+        ]
+        
+        return {
+            "id_producto": codigo,
+            "estados": estados
+        }</code></pre>
+
+<h3>Paso 3: Crear Controller</h3>
+
+<strong>Archivo:</strong> <code>app/api/inventario_productos_controller.py</code>
+
+<pre><code class="language-python">from fastapi import APIRouter, Depends, HTTPException
+
+router = APIRouter(prefix="/api/productos", tags=["productos"])
+
+@router.get("/{codigo}/estados")
+def listar_estados_producto(codigo: str, db: Session = Depends(get_db)):
+    """
+    Obtiene todos los estados de un producto.
+    
+    Ejemplo:
+        GET /api/productos/S1/estados
+        
+    Respuesta:
+        {
+            "id_producto": "S1",
+            "estados": [
+                {"estado": "Disponible", "cantidad": 100},
+                {"estado": "Reservado", "cantidad": 20},
+                {"estado": "A Despacho", "cantidad": 10}
+            ]
+        }
+    """
+    service = InventarioProductosService(db)
+    try:
+        resultado = service.listar_estados_producto(codigo)
+        return resultado
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))</code></pre>
+
+<h3>Paso 4: Probar</h3>
+
+<pre><code class="language-bash">curl http://localhost:5050/api/productos/S1/estados
+
+<h1>Respuesta:</h1>
+<h1>{</h1>
+<h1>  "id_producto": "S1",</h1>
+<h1>  "estados": [</h1>
+<h1>    {"estado": "Disponible", "cantidad": 100},</h1>
+<h1>    {"estado": "Reservado", "cantidad": 0},</h1>
+<h1>    {"estado": "A Despacho", "cantidad": 0}</h1>
+<h1>  ]</h1>
+<h1>}</h1></code></pre>
+
+<p>---</p>
+
+<h2>Patrón 2: Agregar un Nuevo Worker Asíncrono</h2>
+
+<h3>Caso de Uso</h3>
+<p>Crear worker que notifique por email cuando una orden se completa.</p>
+
+<h3>Paso 1: Definir Worker en tasks.py</h3>
+
+<strong>Archivo:</strong> <code>app/tasks.py</code>
+
+<pre><code class="language-python">def notificar_orden_completada(orden_id: int) -> None:
+    """
+    Worker que envía notificación cuando una orden se completa.
+    
+    Args:
+        orden_id: ID de la orden completada
+    """
+    session = _ensure_session()
+    try:
+        # 1. Obtener orden
+        ordenes_service = OrdenesFabricacionService(session)
+        orden = ordenes_service.retrieve(orden_id)
+        
+        if not orden:
+            print(f"[NOTIFICACION] Orden #{orden_id} no encontrada")
+            return
+        
+        # 2. Validar estado
+        if orden.estado != "completada":
+            print(f"[NOTIFICACION] Orden #{orden_id} no está completada")
+            return
+        
+        # 3. Simular envío de email (aquí iría lógica real)
+        print(f"[NOTIFICACION] 📧 Enviando email para orden #{orden_id}")
+        time.sleep(0.5)  # Simular latencia de servicio de email
+        
+        # 4. Registrar en BD que se notificó
+        if isinstance(orden.detalle, dict):
+            orden.detalle["notificacion_enviada"] = True
+            orden.detalle["notificacion_timestamp"] = time.time()
+        
+        session.commit()
+        print(f"[NOTIFICACION] ✓ Email enviado para orden #{orden_id}")
+        
+    except Exception as exc:
+        print(f"[NOTIFICACION] ✗ Error en orden #{orden_id}: {exc}")
+        raise
+    finally:
+        session.close()</code></pre>
+
+<h3>Paso 2: Encolar Worker desde Ingreso de Productos</h3>
+
+<strong>Archivo:</strong> <code>app/services/inventario/productos_service.py</code>
+
+<p>Modificar método <code>incrementar_stock</code>:</p>
+
+<pre><code class="language-python">def incrementar_stock(self, codigo, cantidad, estado="Disponible"):
+    # ... código existente ...
+    
+    # Completar órdenes
+    for orden in ordenes_pendientes:
+        if cantidad_disponible >= faltante:
+            orden.estado = "completada"
+            
+            # ✨ NUEVO: Encolar notificación
+            from app.tasks import queue, notificar_orden_completada
+            queue.enqueue(notificar_orden_completada, orden.id)</code></pre>
+
+<h3>Paso 3: Probar</h3>
+
+<pre><code class="language-bash"><h1>1. Crear orden</h1>
+curl -X POST http://localhost:5050/api/fabricacion/ordenes \
+  -H "Content-Type: application/json" \
+  -d '{"id_producto": "S1", "cantidad": 50}'
+
+<h1>Respuesta: {"id": 10, "estado": "confirmado", ...}</h1>
+
+<h1>2. Ingresar productos (simula fábrica terminando)</h1>
+curl -X POST http://localhost:5050/api/productos/ingresos \
+  -H "Content-Type: application/json" \
+  -d '{"codigo": "S1", "cantidad": 50}'
+
+<h1>3. Ver logs de worker</h1>
+docker compose logs -f worker | grep NOTIFICACION
+
+<h1>Salida esperada:</h1>
+<h1>[NOTIFICACION] 📧 Enviando email para orden #10</h1>
+<h1>[NOTIFICACION] ✓ Email enviado para orden #10</h1></code></pre>
+
+<p>---</p>
+
+<h2>Patrón 3: Agregar una Nueva Tabla/Modelo</h2>
+
+<h3>Caso de Uso</h3>
+<p>Agregar tabla <code>alertas</code> para registrar alertas de stock bajo.</p>
+
+<h3>Paso 1: Definir Modelo SQLAlchemy</h3>
+
+<strong>Archivo:</strong> <code>app/models/entities.py</code>
+
+<pre><code class="language-python">class Alerta(Base):
+    __tablename__ = "alertas"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    id_producto = Column(String(10), nullable=False, index=True)
+    tipo = Column(String(50), nullable=False)  # "stock_bajo", "stock_critico"
+    mensaje = Column(Text, nullable=True)
+    cantidad_actual = Column(Integer, nullable=False)
+    umbral = Column(Integer, nullable=False)
+    estado = Column(String(20), default="pendiente")  # "pendiente", "resuelta"
+    created_at = Column(DateTime, default=datetime.utcnow)
+    resuelta_at = Column(DateTime, nullable=True)</code></pre>
+
+<h3>Paso 2: Crear Repositorio</h3>
+
+<strong>Archivo:</strong> <code>app/repositories/alertas_repository.py</code> (nuevo)
+
+<pre><code class="language-python">from sqlalchemy.orm import Session
+from app.models.entities import Alerta
+
+class AlertasRepository:
+    def __init__(self, session: Session):
+        self.session = session
+    
+    def create(self, data: dict) -> Alerta:
+        """Crear nueva alerta."""
+        alerta = Alerta(<strong>data)
+        self.session.add(alerta)
+        self.session.commit()
+        self.session.refresh(alerta)
+        return alerta
+    
+    def get_all(self) -> list[Alerta]:
+        """Obtener todas las alertas."""
+        return self.session.query(Alerta).all()
+    
+    def get_pendientes(self) -> list[Alerta]:
+        """Obtener alertas pendientes."""
+        return self.session.query(Alerta)\
+            .filter_by(estado="pendiente")\
+            .order_by(Alerta.created_at.desc())\
+            .all()
+    
+    def marcar_resuelta(self, alerta_id: int) -> Alerta:
+        """Marcar alerta como resuelta."""
+        alerta = self.session.query(Alerta).filter_by(id=alerta_id).first()
+        if alerta:
+            alerta.estado = "resuelta"
+            alerta.resuelta_at = datetime.utcnow()
+            self.session.commit()
+        return alerta</code></pre>
+
+<h3>Paso 3: Crear Servicio</h3>
+
+</strong>Archivo:<strong> <code>app/services/alertas_service.py</code> (nuevo)
+
+<pre><code class="language-python">from app.repositories.alertas_repository import AlertasRepository
+
+class AlertasService:
+    def __init__(self, session):
+        self.repository = AlertasRepository(session)
+        self.session = session
+    
+    def crear_alerta_stock_bajo(self, codigo, cantidad_actual, umbral):
+        """Crear alerta de stock bajo."""
+        alerta = self.repository.create({
+            "id_producto": codigo,
+            "tipo": "stock_bajo",
+            "mensaje": f"Stock de {codigo} bajo: {cantidad_actual} < {umbral}",
+            "cantidad_actual": cantidad_actual,
+            "umbral": umbral,
+            "estado": "pendiente"
+        })
+        return alerta
+    
+    def listar_pendientes(self):
+        """Listar alertas pendientes."""
+        return self.repository.get_pendientes()</code></pre>
+
+<h3>Paso 4: Integrar en Flujo Existente</h3>
+
+</strong>Archivo:<strong> <code>app/services/inventario/productos_service.py</code>
+
+<pre><code class="language-python">from app.services.alertas_service import AlertasService
+
+class InventarioProductosService:
+    def transferir_stock(self, codigo, estado_origen, estado_destino, cantidad):
+        # ... código existente ...
+        
+        # Verificar si stock disponible cayó bajo umbral
+        if estado_origen == "Disponible":
+            disponible = self.repository.get_by_codigo_estado(codigo, "Disponible")
+            if disponible.cantidad < 500:  # Umbral
+                # Crear alerta
+                alertas_service = AlertasService(self.session)
+                alertas_service.crear_alerta_stock_bajo(
+                    codigo,
+                    cantidad_actual=disponible.cantidad,
+                    umbral=500
+                )</code></pre>
+
+<h3>Paso 5: Crear Tabla en BD</h3>
+
+<pre><code class="language-bash"><h1>Opción 1: Recrear BD (⚠️ elimina datos)</h1>
+docker compose exec api python -m app.cli create-db
+
+<h1>Opción 2: Ejecutar SQL manualmente</h1>
+docker compose exec db psql -U postgres -d inventarios_db
+
+<h1>En psql:</h1>
+CREATE TABLE alertas (
+    id SERIAL PRIMARY KEY,
+    id_producto VARCHAR(10) NOT NULL,
+    tipo VARCHAR(50) NOT NULL,
+    mensaje TEXT,
+    cantidad_actual INTEGER NOT NULL,
+    umbral INTEGER NOT NULL,
+    estado VARCHAR(20) DEFAULT 'pendiente',
+    created_at TIMESTAMP DEFAULT NOW(),
+    resuelta_at TIMESTAMP,
+    INDEX idx_producto (id_producto),
+    INDEX idx_estado (estado)
+);</code></pre>
+
+<p>---</p>
+
+<h2>Patrón 4: Agregar Tests</h2>
+
+<h3>Caso de Uso</h3>
+<p>Testear el servicio de alertas.</p>
+
+<h3>Archivo de Test</h3>
+
+</strong>Archivo:<strong> <code>tests/test_alertas_service.py</code> (nuevo)
+
+<pre><code class="language-python">import pytest
+from app.services.alertas_service import AlertasService
+
+def test_crear_alerta_stock_bajo(test_db_session):
+    """Test de creación de alerta."""
+    # Arrange
+    service = AlertasService(test_db_session)
+    
+    # Act
+    alerta = service.crear_alerta_stock_bajo(
+        codigo="S1",
+        cantidad_actual=300,
+        umbral=500
+    )
+    
+    # Assert
+    assert alerta.id_producto == "S1"
+    assert alerta.tipo == "stock_bajo"
+    assert alerta.cantidad_actual == 300
+    assert alerta.umbral == 500
+    assert alerta.estado == "pendiente"
+
+def test_listar_alertas_pendientes(test_db_session):
+    """Test de listado de alertas pendientes."""
+    # Arrange
+    service = AlertasService(test_db_session)
+    service.crear_alerta_stock_bajo("S1", 300, 500)
+    service.crear_alerta_stock_bajo("S2", 200, 500)
+    
+    # Act
+    pendientes = service.listar_pendientes()
+    
+    # Assert
+    assert len(pendientes) == 2
+    assert all(a.estado == "pendiente" for a in pendientes)</code></pre>
+
+<h3>Ejecutar Tests</h3>
+
+<pre><code class="language-bash"><h1>Opción 1: Con pytest dentro del contenedor</h1>
+docker compose exec api pytest tests/test_alertas_service.py -v
+
+<h1>Opción 2: Localmente (requiere instalación local)</h1>
+pip install -r requirements-dev.txt
+pytest tests/test_alertas_service.py -v</code></pre>
+
+<p>---</p>
+
+<h2>Mejores Prácticas</h2>
+
+<h3>✅ DO</h3>
+
+<p>1. </strong>Validar entrada en controllers<strong></p>
+   <pre><code class="language-python">   @router.post("/productos")
+   def crear_producto(body: ProductoCreate):  # Pydantic valida
+       ...
+   ``<code>
+
+2. </strong>Lógica en services, no en controllers<strong>
+   </code>`<code>python
+   # ✅ BIEN
+   @router.post("/reservas")
+   def reservar(body, db):
+       service = ProductosService(db)
+       return service.reservar_stock(body.codigo, body.cantidad)
+   
+   # ❌ MAL
+   @router.post("/reservas")
+   def reservar(body, db):
+       producto = db.query(...).first()  # Lógica en controller
+       producto.cantidad -= body.cantidad
+   </code>`<code>
+
+3. </strong>Usar transacciones explícitas<strong>
+   </code>`<code>python
+   try:
+       # Operaciones
+       session.commit()
+   except Exception:
+       session.rollback()
+       raise
+   </code>`<code>
+
+4. </strong>Cerrar sesiones en workers<strong>
+   </code>`<code>python
+   def mi_worker(id):
+       session = _ensure_session()
+       try:
+           # Trabajo
+       finally:
+           session.close()
+   </code>`<code>
+
+5. </strong>Documentar funciones<strong>
+   </code>`<code>python
+   def procesar_orden(orden_id: int) -> None:
+       """
+       Procesa una orden de fabricación.
+       
+       Args:
+           orden_id: ID de la orden
+           
+       Raises:
+           ValueError: Si orden no existe
+       """
+   </code>`<code>
+
+<h3>❌ DON'T</h3>
+
+1. </strong>No mezclar lógica de negocio en controllers<strong>
+2. </strong>No compartir sesiones entre procesos<strong>
+3. </strong>No bloquear workers indefinidamente<strong>
+4. </strong>No ignorar errores silenciosamente<strong>
+
+---
+
+<h2>Comandos Útiles</h2>
+
+<h3>Desarrollo</h3>
+</code></pre>bash
+<h1>Ver logs en tiempo real</h1>
+<p>docker compose logs -f api</p>
+<p>docker compose logs -f worker</p>
+
+<h1>Reiniciar servicios</h1>
+<p>docker compose restart api</p>
+<p>docker compose restart worker</p>
+
+<h1>Rebuil después de cambios de código</h1>
+<p>docker compose up --build</p>
+
+<h1>Ejecutar comando en contenedor</h1>
+<p>docker compose exec api python -m app.cli <comando></p>
+
+<h1>Shell interactivo</h1>
+<p>docker compose exec api python</p>
+<p>>>> from app.database import SessionLocal</p>
+<p>>>> session = SessionLocal()</p>
+<p>>>> # Experimentar...</p>
+<pre><code class="language-">
+<h3>Base de Datos</h3>
+</code></pre>bash
+<h1>Conectar a PostgreSQL</h1>
+<p>docker compose exec db psql -U postgres -d inventarios_db</p>
+
+<h1>Recrear BD (⚠️ elimina datos)</h1>
+<p>docker compose exec api python -m app.cli create-db</p>
+
+<h1>Cargar datos de ejemplo</h1>
+<p>docker compose exec api python -m app.cli seed-db</p>
+
+<h1>Backup</h1>
+<p>docker compose exec db pg_dump -U postgres inventarios_db > backup.sql</p>
+<pre><code class="language-">
+<h3>Redis/RQ</h3>
+</code></pre>bash
+<h1>Conectar a Redis</h1>
+<p>docker compose exec redis redis-cli</p>
+
+<h1>Ver trabajos en cola</h1>
+<p>> LLEN rq:queue:default</p>
+
+<h1>Ver workers activos</h1>
+<p>> SMEMBERS rq:workers</p>
+
+<h1>Limpiar cola (desarrollo)</h1>
+<p>> DEL rq:queue:default</p>
+<pre><code class="language-">
+---
+
+<h2>Errores Comunes</h2>
+
+<h3>Error: "Session is closed"</h3>
+
+</strong>Causa:<strong> Usar sesión después de cerrarla.
+
+</strong>Solución:<strong></code></pre>python
+<h1>❌ MAL</h1>
+<p>session = SessionLocal()</p>
+<p>session.close()</p>
+<p>producto = session.query(Producto).first()  # Error!</p>
+
+<h1>✅ BIEN</h1>
+<p>session = SessionLocal()</p>
+<p>try:</p>
+<p>    producto = session.query(Producto).first()</p>
+<p>finally:</p>
+<p>    session.close()</p>
+<pre><code class="language-">
+<h3>Error: "Worker no procesa trabajos"</h3>
+
+</strong>Causa:<strong> Worker no está corriendo o cola incorrecta.
+
+</strong>Solución:<strong></code></pre>bash
+<h1>Verificar worker</h1>
+<p>docker compose ps worker</p>
+<h1>Estado debe ser "Up"</h1>
+
+<h1>Ver logs de worker</h1>
+<p>docker compose logs worker</p>
+
+<h1>Si no está corriendo:</h1>
+<p>docker compose up worker</p>
+<pre><code class="language-">
+<h3>Error: "Circular import"</h3>
+
+</strong>Causa:<strong> Imports mutuos entre módulos.
+
+</strong>Solución:<strong> Usar lazy imports
+</code></pre>python
+<h1>❌ MAL: Import al inicio</h1>
+<p>from app.tasks import queue</p>
+
+<h1>✅ BIEN: Import dentro de función</h1>
+<p>def mi_funcion():</p>
+<p>    from app.tasks import queue</p>
+<p>    queue.enqueue(...)</p>
+</code>`<code>
+
+<p>---</p>
+
+<h2>Recursos</h2>
+
+<h3>Documentación Externa</h3>
+<ul>
+<li><a href="https://fastapi.tiangolo.com/">FastAPI Docs</a></li>
+<li><a href="https://python-rq.org/">RQ Docs</a></li>
+<li><a href="https://docs.sqlalchemy.org/">SQLAlchemy Docs</a></li>
+<li><a href="https://docs.pydantic.dev/">Pydantic Docs</a></li>
+</ul>
+
+<h3>Documentación Interna</h3>
+<ul>
+<li><a href="00_INDICE.md">00_INDICE.md</a> - Índice de documentación</li>
+<li><a href="01_ARQUITECTURA_GENERAL.md">01_ARQUITECTURA_GENERAL.md</a> - Arquitectura</li>
+<li><a href="02_SISTEMA_COLAS.md">02_SISTEMA_COLAS.md</a> - Sistema de colas</li>
+<li><a href="TESTING.md">TESTING.md</a> - Guía de testing</li>
+</ul>
+
+<p>---</p>
+
+<h2>Próximos Pasos</h2>
+
+<p>1. </strong>Prueba los patrones:<strong> Implementa los ejemplos de esta guía</p>
+<p>2. </strong>Lee el código fuente:<strong> Explora </code>app/<code> para ver más ejemplos</p>
+<p>3. </strong>Ejecuta los tests:<strong> </code>pytest tests/ -v`</p>
+<p>4. </strong>Contribuye:** Crea un PR con tu nueva funcionalidad</p>
+
+<p>¡Happy coding! 🚀</p>
+
+        </main>
+    </div>
+
+    <footer class="footer">
+        <p>Desarrollado con ❤️ usando FastAPI, Redis, RQ y PostgreSQL</p>
+        <p><a href="../index.html">← Volver al índice</a></p>
+    </footer>
+
+    <script>
+        hljs.highlightAll();
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</body>
+</html>

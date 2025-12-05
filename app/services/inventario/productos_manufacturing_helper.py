@@ -102,7 +102,7 @@ class ProductosManufacturingHelper:
         stock_minimo: int,
         stock_objetivo: int,
         lote_produccion: int,
-    ) -> dict[str, int]:
+    ) -> dict[str, int | str]:
         """
         Evalúa si el stock está por debajo del mínimo y calcula reposición.
 
@@ -114,7 +114,7 @@ class ProductosManufacturingHelper:
             lote_produccion: Tamaño de lote de producción
 
         Returns:
-            Dict con tiempo estimado y acción a tomar
+            Dict con tiempo estimado, acción y cantidad a reponer (si aplica)
         """
         if cantidad_disponible >= stock_minimo:
             return {"tiempo_estimado": 0, "accion": "ok"}
@@ -123,8 +123,9 @@ class ProductosManufacturingHelper:
         if cantidad_a_producir <= 0:
             return {"tiempo_estimado": 0, "accion": "ok"}
 
+        cantidad_reponer = max(cantidad_a_producir, lote_produccion)
         plan = self.fabricacion_service.solicitar_plan(
-            codigo, max(cantidad_a_producir, lote_produccion)
+            codigo, cantidad_reponer
         )
 
         tiempo_reabastecimiento = self._solicitar_piezas_faltantes(plan.materiales)
@@ -133,6 +134,7 @@ class ProductosManufacturingHelper:
         return {
             "tiempo_estimado": tiempo_reabastecimiento + tiempo_produccion,
             "accion": "fabricar",
+            "cantidad_reponer": cantidad_reponer,
         }
 
     def _solicitar_piezas_faltantes(self, materiales: list[dict]) -> int:

@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ Paralelismo y Concurrencia - Sistema de Inventario</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        
+:root {
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --secondary: #8b5cf6;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --dark: #1e293b;
+    --gray: #64748b;
+    --light: #f1f5f9;
+    --white: #ffffff;
+    --border: #e2e8f0;
+    --code-bg: #282c34;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: var(--light);
+    color: var(--dark);
+    line-height: 1.7;
+}
+
+.navbar {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.nav-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-brand {
+    color: var(--white);
+    font-size: 1.25rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.nav-links {
+    display: flex;
+    gap: 24px;
+}
+
+.nav-links a {
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s;
+}
+
+.nav-links a:hover {
+    color: var(--white);
+}
+
+.container {
+    max-width: 1400px;
+    margin: 40px auto;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 40px;
+    padding: 0 24px;
+}
+
+.sidebar {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 24px;
+    height: fit-content;
+    position: sticky;
+    top: 100px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.sidebar h3 {
+    color: var(--dark);
+    font-size: 1.1rem;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--primary);
+}
+
+.sidebar-menu {
+    list-style: none;
+}
+
+.sidebar-menu li {
+    margin-bottom: 8px;
+}
+
+.sidebar-menu a {
+    display: block;
+    padding: 10px 12px;
+    color: var(--gray);
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.3s;
+    font-size: 0.95rem;
+}
+
+.sidebar-menu a:hover {
+    background: var(--primary);
+    color: var(--white);
+    transform: translateX(4px);
+}
+
+.content {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 40px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    min-height: 600px;
+}
+
+.content h1 {
+    color: var(--dark);
+    font-size: 2.5rem;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 3px solid var(--primary);
+}
+
+.content h2 {
+    color: var(--dark);
+    font-size: 2rem;
+    margin-top: 40px;
+    margin-bottom: 20px;
+    padding-left: 12px;
+    border-left: 4px solid var(--primary);
+}
+
+.content h3 {
+    color: var(--dark);
+    font-size: 1.5rem;
+    margin-top: 32px;
+    margin-bottom: 16px;
+}
+
+.content p {
+    margin-bottom: 16px;
+    color: var(--gray);
+}
+
+.content ul, .content ol {
+    margin: 16px 0 16px 24px;
+    color: var(--gray);
+}
+
+.content li {
+    margin-bottom: 8px;
+}
+
+.content a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.content a:hover {
+    text-decoration: underline;
+}
+
+.content code {
+    font-family: 'Fira Code', monospace;
+    background: var(--light);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: var(--danger);
+}
+
+.content pre {
+    background: var(--code-bg);
+    border-radius: 8px;
+    padding: 20px;
+    overflow-x: auto;
+    margin: 20px 0;
+}
+
+.content pre code {
+    background: none;
+    color: #abb2bf;
+    padding: 0;
+}
+
+.content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+}
+
+.content th {
+    background: var(--primary);
+    color: var(--white);
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+}
+
+.content td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.content tr:hover {
+    background: var(--light);
+}
+
+.content blockquote {
+    border-left: 4px solid var(--primary);
+    padding: 16px 20px;
+    margin: 20px 0;
+    background: var(--light);
+    border-radius: 0 8px 8px 0;
+}
+
+.footer {
+    text-align: center;
+    padding: 40px 24px;
+    color: var(--gray);
+}
+
+.footer a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+@media (max-width: 1024px) {
+    .container {
+        grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+        position: relative;
+        top: 0;
+    }
+}
+
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="../index.html" class="nav-brand">📚 Documentación Inventario</a>
+            <div class="nav-links">
+                <a href="../index.html">🏠 Inicio</a>
+                <a href="00_indice.html">📑 Índice</a>
+                <a href="https://github.com" target="_blank">💻 GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <aside class="sidebar">
+            <h3>📖 Navegación</h3>
+            <ul class="sidebar-menu">
+                <li><a href="00_indice.html">🗺️ Índice</a></li>
+                <li><a href="01_arquitectura.html">🏗️ Arquitectura</a></li>
+                <li><a href="02_sistema_colas.html">🔄 Sistema de Colas</a></li>
+                <li><a href="03_paralelismo.html">⚡ Paralelismo</a></li>
+                <li><a href="04_flujos.html">📊 Flujos</a></li>
+                <li><a href="05_guia_desarrollo.html">🛠️ Desarrollo</a></li>
+                <li><a href="readme.html">📖 README</a></li>
+                <li><a href="testing.html">🧪 Testing</a></li>
+            </ul>
+        </aside>
+
+        <main class="content">
+            <h1>⚡ Paralelismo y Concurrencia</h1>
+
+<h2>Introducción</h2>
+
+<p>Este documento explica cómo el sistema maneja <strong>múltiples tareas simultáneamente</strong> usando paralelismo y concurrencia. Entender estos conceptos es clave para aprovechar la arquitectura del sistema.</p>
+
+<h2>Diferencia: Paralelismo vs Concurrencia</h2>
+
+<h3>Concurrencia</h3>
+<p>> <strong>Concurrencia</strong> = Manejar múltiples tareas a la vez (pueden intercalarse)</p>
+
+<strong>Analogía:</strong> Un chef cocinando solo
+<ul>
+<li>Pone agua a hervir</li>
+<li>Mientras hierve, pica vegetales</li>
+<li>Revisa el agua, luego vuelve a picar</li>
+<li><strong>Resultado:</strong> Progreso en múltiples tareas, pero UNA a la vez</li>
+</ul>
+
+<strong>En nuestro sistema:</strong>
+<ul>
+<li>FastAPI maneja múltiples requests (usa async/await)</li>
+<li>Workers RQ procesan múltiples trabajos (uno a la vez por worker)</li>
+</ul>
+
+<h3>Paralelismo</h3>
+<p>> <strong>Paralelismo</strong> = Ejecutar múltiples tareas literalmente al mismo tiempo</p>
+
+<strong>Analogía:</strong> Tres chefs cocinando
+<ul>
+<li>Chef 1: Hierve agua</li>
+<li>Chef 2: Pica vegetales</li>
+<li>Chef 3: Cocina carne</li>
+<li><strong>Resultado:</strong> Tres tareas simultáneas REALES</li>
+</ul>
+
+<strong>En nuestro sistema:</strong>
+<ul>
+<li>Contenedor API + Contenedor Worker ejecutan en paralelo</li>
+<li>Múltiples workers ejecutan trabajos en paralelo</li>
+<li>Múltiples requests a la API se procesan en paralelo</li>
+</ul>
+
+<pre><code class="language-">Concurrencia:  Task1 → Task2 → Task1 → Task3 (intercaladas)
+Paralelismo:   Task1 ═══════════════════════
+               Task2 ═══════════════════════  (simultáneas)
+               Task3 ═══════════════════════</code></pre>
+
+<h2>Paralelismo en el Sistema</h2>
+
+<h3>Arquitectura Multi-Container</h3>
+
+<pre><code class="language-mermaid">graph TB
+    subgraph "Paralelismo de Contenedores"
+        subgraph "Contenedor API"
+            API[FastAPI<br/>Procesa requests]
+        end
+        
+        subgraph "Contenedor Worker 1"
+            W1[RQ Worker<br/>Procesa solicitud #1]
+        end
+        
+        subgraph "Contenedor Worker 2"
+            W2[RQ Worker<br/>Procesa solicitud #2]
+        end
+        
+        subgraph "Contenedor Worker 3"
+            W3[RQ Worker<br/>Procesa orden #5]
+        end
+    end
+    
+    API -.->|Encola trabajos| W1
+    API -.->|Encola trabajos| W2
+    API -.->|Encola trabajos| W3
+    
+    style API fill:#4CAF50
+    style W1 fill:#2196F3
+    style W2 fill:#2196F3
+    style W3 fill:#2196F3</code></pre>
+
+<strong>Ejecución en paralelo:</strong>
+<ul>
+<li>API recibe y responde requests</li>
+<li>Worker 1 procesa solicitud de pieza P1</li>
+<li>Worker 2 procesa solicitud de pieza P2</li>
+<li>Worker 3 procesa orden de fabricación</li>
+</ul>
+
+<strong>Todos al mismo tiempo</strong> ✅
+
+<h3>Timeline de Ejecución Paralela</h3>
+
+<pre><code class="language-">Tiempo →
+0s    1s    2s    3s    4s    5s    6s
+
+API     │ Request 1 │ Request 2 │ Request 3 │ Request 4 │
+        │  (50ms)   │  (50ms)   │  (50ms)   │  (50ms)   │
+        └─enqueue───┴─enqueue───┴─enqueue───┴─enqueue───
+
+Worker1 │════════ Solicitud #1 (5s) ════════│
+        │                                    │
+Worker2              │════════ Solicitud #2 (5s) ════════│
+                     │                                    │
+Worker3                        │═══ Orden #5 (3s) ═══│</code></pre>
+
+<strong>Observaciones:</strong>
+<ul>
+<li>API procesa 4 requests mientras workers trabajan</li>
+<li>Worker 1 y Worker 2 procesan solicitudes en paralelo</li>
+<li><strong>Sin paralelismo:</strong> 5s + 5s + 3s = 13s total</li>
+<li><strong>Con paralelismo:</strong> ~6s total (tareas se solapan)</li>
+</ul>
+
+<h2>Concurrencia en la API</h2>
+
+<h3>FastAPI + Uvicorn</h3>
+
+<p>FastAPI usa <strong>asyncio</strong> para manejar múltiples requests concurrentemente en un solo proceso.</p>
+
+<pre><code class="language-python"><h1>FastAPI maneja esto automáticamente</h1>
+@app.get("/api/productos")
+def listar_productos(db: Session = Depends(get_db)):
+    # Request 1 ejecuta esta función...
+    # Request 2 ejecuta esta función al mismo tiempo...
+    # Request 3 ejecuta esta función al mismo tiempo...
+    return productos</code></pre>
+
+<strong>Capacidad:</strong> Uvicorn puede manejar <strong>cientos de requests/segundo</strong> en un solo contenedor.
+
+<h3>Ejemplo: Múltiples Clientes</h3>
+
+<pre><code class="language-">Cliente A → GET /api/productos
+Cliente B → POST /api/productos/reservas
+Cliente C → GET /api/proveedores
+Cliente D → POST /api/proveedores/solicitudes_async
+
+API FastAPI (1 contenedor)
+│
+├─ Thread 1: Procesa request de Cliente A
+├─ Thread 2: Procesa request de Cliente B
+├─ Thread 3: Procesa request de Cliente C
+└─ Thread 4: Procesa request de Cliente D</code></pre>
+
+<p>Todas las requests se procesan <strong>concurrentemente</strong>.</p>
+
+<h2>Concurrencia en Workers</h2>
+
+<h3>Un Worker = Un Trabajo a la Vez</h3>
+
+<p>Cada worker RQ procesa trabajos <strong>secuencialmente</strong>:</p>
+
+<pre><code class="language-python"><h1>Worker 1</h1>
+while True:
+    job = queue.dequeue()  # Toma 1 trabajo de la cola
+    job.perform()          # Lo ejecuta hasta completar
+    # Solo después toma el siguiente</code></pre>
+
+<strong>Un worker:</strong>
+<pre><code class="language-">Trabajo 1 → Trabajo 2 → Trabajo 3 → Trabajo 4</code></pre>
+
+<h3>Múltiples Workers = Paralelismo</h3>
+
+Pero podemos tener <strong>múltiples workers</strong> procesando en paralelo:
+
+<pre><code class="language-">Worker 1: Trabajo 1 → Trabajo 4 → Trabajo 7
+Worker 2: Trabajo 2 → Trabajo 5 → Trabajo 8
+Worker 3: Trabajo 3 → Trabajo 6 → Trabajo 9</code></pre>
+
+<strong>Throughput:</strong> 3x más rápido con 3 workers.
+
+<h2>Estado Compartido: PostgreSQL</h2>
+
+<h3>Problema de Concurrencia</h3>
+
+<p>Cuando múltiples procesos (API + Workers) acceden a la misma base de datos, pueden ocurrir <strong>race conditions</strong>.</p>
+
+<strong>Ejemplo de race condition:</strong>
+
+<pre><code class="language-">Estado inicial: pieza.cantidad = 100
+
+Worker 1 lee: cantidad = 100
+Worker 2 lee: cantidad = 100
+Worker 1 escribe: cantidad = 100 + 50 = 150
+Worker 2 escribe: cantidad = 100 + 30 = 130 ❌ (sobreescribe Worker 1)
+
+Resultado esperado: 180
+Resultado real: 130 (perdimos 50 unidades)</code></pre>
+
+<h3>Solución: Transacciones ACID</h3>
+
+<p>PostgreSQL garantiza <strong>atomicidad</strong> con transacciones:</p>
+
+<pre><code class="language-python">def procesar_solicitud_pieza(solicitud_id):
+    session = _ensure_session()
+    try:
+        # Inicio de transacción implícita
+        solicitud = session.query(Solicitud).filter_by(id=solicitud_id).first()
+        solicitud.estado = "en_proceso"
+        session.commit()  # ✅ Commit atómico
+        
+        # Otra transacción
+        pieza = session.query(Pieza).filter_by(id=solicitud.id_pieza).first()
+        pieza.cantidad += solicitud.cantidad
+        session.commit()  # ✅ Commit atómico
+    finally:
+        session.close()</code></pre>
+
+<strong>Garantías de PostgreSQL:</strong>
+<ul>
+<li>✅ <strong>Atomicidad:</strong> Commit completo o rollback completo</li>
+<li>✅ <strong>Consistencia:</strong> Datos válidos siempre</li>
+<li>✅ <strong>Aislamiento:</strong> Transacciones no se interfieren</li>
+<li>✅ <strong>Durabilidad:</strong> Commits persisten</li>
+</ul>
+
+<h3>Row-Level Locking</h3>
+
+<p>PostgreSQL usa <strong>locks</strong> para evitar race conditions:</p>
+
+<pre><code class="language-sql">-- Worker 1 ejecuta
+BEGIN;
+SELECT <em> FROM inventario_piezas WHERE id = 1 FOR UPDATE;  -- 🔒 Lock
+UPDATE inventario_piezas SET cantidad = cantidad + 50 WHERE id = 1;
+COMMIT;  -- 🔓 Unlock
+
+-- Worker 2 debe esperar hasta que Worker 1 haga commit
+BEGIN;
+SELECT </em> FROM inventario_piezas WHERE id = 1 FOR UPDATE;  -- ⏳ Espera...
+-- ... Worker 1 hace commit ...
+UPDATE inventario_piezas SET cantidad = cantidad + 30 WHERE id = 1;  -- ✅ Ahora sí
+COMMIT;</code></pre>
+
+<strong>Resultado:</strong> 100 + 50 + 30 = 180 ✅ Correcto
+
+<h2>Gestión de Estados</h2>
+
+<h3>Estados de Órdenes de Fabricación</h3>
+
+<p>Las órdenes pasan por múltiples estados, y <strong>API</strong> y <strong>Workers</strong> los modifican:</p>
+
+<pre><code class="language-mermaid">stateDiagram-v2
+    [<em>] --> calculando: API crea orden
+    calculando --> confirmando: API calcula piezas
+    confirmando --> confirmado: API confirma con fábrica
+    confirmando --> confirmacion_fallida: Fábrica no responde
+    confirmado --> consumiendo_piezas: Worker inicia
+    consumiendo_piezas --> esperando_fabricacion: Worker consume piezas
+    esperando_fabricacion --> completada: Webhook recibe productos
+    confirmacion_fallida --> fallida: Worker marca fallo
+    
+    note right of confirmado
+        API encola worker
+    end note
+    
+    note left of consumiendo_piezas
+        Worker toma control
+    end note</code></pre>
+
+<strong>Responsabilidades:</strong>
+<ul>
+<li><strong>API:</strong> Estados iniciales (<code>calculando</code>, <code>confirmando</code>, <code>confirmado</code>)</li>
+<li><strong>Worker:</strong> Estados de procesamiento (<code>consumiendo_piezas</code>, <code>esperando_fabricacion</code>)</li>
+<li><strong>Webhook:</strong> Estado final (<code>completada</code>)</li>
+</ul>
+
+<h3>Sincronización de Estados</h3>
+
+<pre><code class="language-python"><h1>API: Encola trabajo cuando orden está confirmada</h1>
+if orden.estado == "confirmado":
+    queue.enqueue(procesar_orden_fabricacion, orden.id)
+
+<h1>Worker: Solo procesa si estado es correcto</h1>
+def procesar_orden_fabricacion(orden_id):
+    orden = obtener_orden(orden_id)
+    if orden.estado == "confirmado":  # ✅ Validación
+        orden.estado = "consumiendo_piezas"
+        # ... procesar ...</code></pre>
+
+<strong>Regla:</strong> Siempre validar estado antes de modificar.
+
+<h2>Escalabilidad Horizontal</h2>
+
+<h3>Escalar Workers</h3>
+
+<pre><code class="language-yaml"><h1>docker-compose.yml</h1>
+services:
+  worker:
+    build: .
+    command: rq worker --url redis://redis:6379/0 default
+    deploy:
+      replicas: 10  # 10 workers en paralelo</code></pre>
+
+<strong>Resultado:</strong>
+<ul>
+<li>10 solicitudes procesadas simultáneamente</li>
+<li>Throughput 10x mayor</li>
+<li>CPU distribuido entre workers</li>
+</ul>
+
+<h3>Escalar API</h3>
+
+<pre><code class="language-yaml"><h1>docker-compose.yml</h1>
+services:
+  api:
+    build: .
+    command: uvicorn main:app --host 0.0.0.0 --port 5000
+    deploy:
+      replicas: 3  # 3 instancias de API
+    ports:
+      - "5050-5052:5000"  # Puertos 5050, 5051, 5052</code></pre>
+
+<strong>Con Load Balancer (nginx):</strong>
+<pre><code class="language-nginx">upstream api_backend {
+    server api:5050;
+    server api:5051;
+    server api:5052;
+}</code></pre>
+
+<strong>Resultado:</strong>
+<ul>
+<li>Requests distribuidos entre 3 APIs</li>
+<li>Tolerancia a fallos (una API cae, otras siguen)</li>
+</ul>
+
+<h2>Pool de Conexiones PostgreSQL</h2>
+
+<h3>Problema de Conexiones</h3>
+
+<p>Cada request/worker necesita una conexión a PostgreSQL. Sin pool:</p>
+
+<pre><code class="language-">Request 1 → Abrir conexión → Cerrar
+Request 2 → Abrir conexión → Cerrar  ❌ Lento
+Request 3 → Abrir conexión → Cerrar</code></pre>
+
+<h3>Solución: Connection Pool</h3>
+
+<pre><code class="language-python"><h1>app/database.py</h1>
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,
+    pool_size=10,        # 10 conexiones persistentes
+    max_overflow=20      # +20 conexiones si pool lleno
+)</code></pre>
+
+<strong>Con pool:</strong>
+<pre><code class="language-">Request 1 → Toma conexión del pool → Devuelve al pool
+Request 2 → Toma conexión del pool → Devuelve al pool  ✅ Rápido
+Request 3 → Toma conexión del pool → Devuelve al pool</code></pre>
+
+<strong>Configuración recomendada:</strong>
+<ul>
+<li><code>pool_size</code>: Número de workers + instancias API</li>
+<li><code>max_overflow</code>: 2x pool_size</li>
+<li>Ejemplo: 10 workers + 3 APIs = pool_size=13, max_overflow=26</li>
+</ul>
+
+<h2>Ventajas del Diseño</h2>
+
+<h3>1. Respuesta Rápida</h3>
+<pre><code class="language-">Sin workers:
+Cliente → API → Procesar 5s → Respuesta
+Total: 5+ segundos ❌
+
+Con workers:
+Cliente → API → Encolar → Respuesta
+         Worker → Procesar 5s
+Total API: ~50ms ✅</code></pre>
+
+<h3>2. Escalabilidad</h3>
+<pre><code class="language-">1 worker:  10 trabajos/minuto
+5 workers: 50 trabajos/minuto
+10 workers: 100 trabajos/minuto</code></pre>
+
+<h3>3. Tolerancia a Fallos</h3>
+<pre><code class="language-">Worker 1: ✓ Procesando
+Worker 2: ✗ Crashed
+Worker 3: ✓ Procesando
+→ Sistema sigue funcionando (2 de 3)</code></pre>
+
+<h3>4. Desacoplamiento</h3>
+<pre><code class="language-">API: Responsable de requests HTTP
+Workers: Responsables de tareas pesadas
+→ Cada uno escala independientemente</code></pre>
+
+<h2>Ejemplo Completo: Timeline Detallado</h2>
+
+<h3>Escenario</h3>
+<ul>
+<li>2 clientes solicitan piezas simultáneamente</li>
+<li>3 workers disponibles</li>
+<li>1 instancia de API</li>
+</ul>
+
+<h3>Timeline</h3>
+
+<pre><code class="language-">Tiempo │ Cliente A        │ Cliente B        │ API              │ Worker 1      │ Worker 2      │ Worker 3
+───────┼─────────────────┼─────────────────┼─────────────────┼──────────────┼──────────────┼──────────────
+0.00s  │ POST solicitud  │                 │                 │ (idle)       │ (idle)       │ (idle)
+0.05s  │                 │                 │ Crear sol #1    │              │              │
+0.05s  │                 │                 │ Encolar #1      │              │              │
+0.05s  │ ← 202 Accepted  │                 │ Responder       │              │              │
+0.10s  │                 │ POST solicitud  │                 │ Procesa #1   │              │
+0.15s  │                 │                 │ Crear sol #2    │   ↓          │              │
+0.15s  │                 │                 │ Encolar #2      │   ↓          │              │
+0.15s  │                 │ ← 202 Accepted  │ Responder       │   ↓          │              │
+0.20s  │                 │                 │ (idle)          │   ↓          │ Procesa #2   │
+1.00s  │ GET /sol/1      │                 │                 │   ↓          │   ↓          │
+1.01s  │ ← completada ✓  │                 │ Consultar DB    │   ↓          │   ↓          │
+2.00s  │                 │ GET /sol/2      │                 │ (idle) ✓     │   ↓          │
+2.01s  │                 │ ← completada ✓  │ Consultar DB    │              │ (idle) ✓     │</code></pre>
+
+<strong>Observaciones:</strong>
+<ul>
+<li>API responde en ~50ms (no espera workers)</li>
+<li>Worker 1 y Worker 2 procesan en paralelo</li>
+<li>Clientes consultan estado cuando quieren</li>
+<li>Worker 3 quedó disponible (no fue necesario)</li>
+</ul>
+
+<h2>Patrones de Concurrencia Usados</h2>
+
+<h3>1. Producer-Consumer Pattern</h3>
+<pre><code class="language-">API (Producer) → Cola → Worker (Consumer)</code></pre>
+
+<h3>2. Shared State Pattern</h3>
+<pre><code class="language-">API ─┐
+     ├→ PostgreSQL (Estado compartido)
+Worker ┘</code></pre>
+
+<h3>3. State Machine Pattern</h3>
+<pre><code class="language-">Estado → Transición → Nuevo Estado
+(con validaciones de estado previo)</code></pre>
+
+<h3>4. Connection Pooling Pattern</h3>
+<pre><code class="language-">Request → Pool de Conexiones → PostgreSQL
+(reúsa conexiones en vez de crear nuevas)</code></pre>
+
+<h2>Mejores Prácticas</h2>
+
+<h3>✅ DO</h3>
+
+<p>1. <strong>Validar estado antes de modificar</strong></p>
+   <pre><code class="language-python">   if orden.estado == "confirmado":
+       orden.estado = "consumiendo_piezas"
+   ``<code>
+
+2. <strong>Usar transacciones atómicas</strong>
+   </code>`<code>python
+   try:
+       # Operaciones
+       session.commit()
+   except:
+       session.rollback()
+   </code>`<code>
+
+3. <strong>Cerrar sesiones siempre</strong>
+   </code>`<code>python
+   try:
+       # Usar sesión
+   finally:
+       session.close()
+   </code>`<code>
+
+4. <strong>Escalar workers según carga</strong>
+   </code>`<code>yaml
+   replicas: 5  # Ajustar según trabajos/minuto
+   </code>`<code>
+
+<h3>❌ DON'T</h3>
+
+1. <strong>No compartir sesiones entre procesos</strong>
+   </code>`<code>python
+   # ❌ Sesión de API no funciona en Worker
+   queue.enqueue(funcion, db=session)
+   </code>`<code>
+
+2. <strong>No asumir orden de ejecución</strong>
+   </code>`<code>python
+   # ❌ No garantizado
+   queue.enqueue(tarea_a)
+   queue.enqueue(tarea_b)  # Puede ejecutarse antes
+   </code>`<code>
+
+3. <strong>No modificar estado sin validar</strong>
+   </code>`<code>python
+   # ❌ Puede causar inconsistencias
+   orden.estado = "completada"  # Sin validar estado previo
+   </code>`<code>
+
+4. <strong>No bloquear workers indefinidamente</strong>
+   </code>`<code>python
+   # ❌ Worker bloqueado
+   while not condicion:
+       time.sleep(1)  # Infinite loop
+   </code>`<code>
+
+<h2>Monitoreo de Concurrencia</h2>
+
+<h3>Ver workers activos</h3></code></pre>bash
+<p>docker compose ps worker</p>
+<h1>Muestra: worker_1, worker_2, worker_3</h1>
+<pre><code class="language-">
+<h3>Ver trabajos procesándose</h3></code></pre>bash
+<p>docker compose logs -f worker | grep "Procesando"</p>
+<h1>[Worker 1] Procesando solicitud #5</h1>
+<h1>[Worker 2] Procesando solicitud #7</h1>
+<pre><code class="language-">
+<h3>Ver pool de conexiones PostgreSQL</h3></code></pre>sql
+<p>SELECT count(</em>) FROM pg_stat_activity WHERE datname = 'inventarios_db';</p>
+<p>-- Muestra: 15 conexiones activas</p>
+</code>``
+
+<h2>Siguientes Pasos</h2>
+
+<p>Ahora que entiendes paralelismo y concurrencia:</p>
+
+<p>1. <strong>Ve flujos completos:</strong> Lee <a href="04_FLUJOS_INVENTARIO.md">04_FLUJOS_INVENTARIO.md</a></p>
+<p>2. <strong>Aprende a desarrollar:</strong> Lee <a href="05_GUIA_DESARROLLO.md">05_GUIA_DESARROLLO.md</a></p>
+<p>3. <strong>Prueba el sistema:</strong> Lee <a href="TESTING.md">TESTING.md</a></p>
+
+        </main>
+    </div>
+
+    <footer class="footer">
+        <p>Desarrollado con ❤️ usando FastAPI, Redis, RQ y PostgreSQL</p>
+        <p><a href="../index.html">← Volver al índice</a></p>
+    </footer>
+
+    <script>
+        hljs.highlightAll();
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</body>
+</html>

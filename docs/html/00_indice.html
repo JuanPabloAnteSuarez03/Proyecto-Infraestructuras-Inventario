@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📚 Documentación del Sistema de Inventario - Sistema de Inventario</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        
+:root {
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --secondary: #8b5cf6;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --dark: #1e293b;
+    --gray: #64748b;
+    --light: #f1f5f9;
+    --white: #ffffff;
+    --border: #e2e8f0;
+    --code-bg: #282c34;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: var(--light);
+    color: var(--dark);
+    line-height: 1.7;
+}
+
+.navbar {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.nav-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-brand {
+    color: var(--white);
+    font-size: 1.25rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.nav-links {
+    display: flex;
+    gap: 24px;
+}
+
+.nav-links a {
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s;
+}
+
+.nav-links a:hover {
+    color: var(--white);
+}
+
+.container {
+    max-width: 1400px;
+    margin: 40px auto;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 40px;
+    padding: 0 24px;
+}
+
+.sidebar {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 24px;
+    height: fit-content;
+    position: sticky;
+    top: 100px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.sidebar h3 {
+    color: var(--dark);
+    font-size: 1.1rem;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--primary);
+}
+
+.sidebar-menu {
+    list-style: none;
+}
+
+.sidebar-menu li {
+    margin-bottom: 8px;
+}
+
+.sidebar-menu a {
+    display: block;
+    padding: 10px 12px;
+    color: var(--gray);
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.3s;
+    font-size: 0.95rem;
+}
+
+.sidebar-menu a:hover {
+    background: var(--primary);
+    color: var(--white);
+    transform: translateX(4px);
+}
+
+.content {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 40px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    min-height: 600px;
+}
+
+.content h1 {
+    color: var(--dark);
+    font-size: 2.5rem;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 3px solid var(--primary);
+}
+
+.content h2 {
+    color: var(--dark);
+    font-size: 2rem;
+    margin-top: 40px;
+    margin-bottom: 20px;
+    padding-left: 12px;
+    border-left: 4px solid var(--primary);
+}
+
+.content h3 {
+    color: var(--dark);
+    font-size: 1.5rem;
+    margin-top: 32px;
+    margin-bottom: 16px;
+}
+
+.content p {
+    margin-bottom: 16px;
+    color: var(--gray);
+}
+
+.content ul, .content ol {
+    margin: 16px 0 16px 24px;
+    color: var(--gray);
+}
+
+.content li {
+    margin-bottom: 8px;
+}
+
+.content a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.content a:hover {
+    text-decoration: underline;
+}
+
+.content code {
+    font-family: 'Fira Code', monospace;
+    background: var(--light);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: var(--danger);
+}
+
+.content pre {
+    background: var(--code-bg);
+    border-radius: 8px;
+    padding: 20px;
+    overflow-x: auto;
+    margin: 20px 0;
+}
+
+.content pre code {
+    background: none;
+    color: #abb2bf;
+    padding: 0;
+}
+
+.content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+}
+
+.content th {
+    background: var(--primary);
+    color: var(--white);
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+}
+
+.content td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.content tr:hover {
+    background: var(--light);
+}
+
+.content blockquote {
+    border-left: 4px solid var(--primary);
+    padding: 16px 20px;
+    margin: 20px 0;
+    background: var(--light);
+    border-radius: 0 8px 8px 0;
+}
+
+.footer {
+    text-align: center;
+    padding: 40px 24px;
+    color: var(--gray);
+}
+
+.footer a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+@media (max-width: 1024px) {
+    .container {
+        grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+        position: relative;
+        top: 0;
+    }
+}
+
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="../index.html" class="nav-brand">📚 Documentación Inventario</a>
+            <div class="nav-links">
+                <a href="../index.html">🏠 Inicio</a>
+                <a href="00_indice.html">📑 Índice</a>
+                <a href="https://github.com" target="_blank">💻 GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <aside class="sidebar">
+            <h3>📖 Navegación</h3>
+            <ul class="sidebar-menu">
+                <li><a href="00_indice.html">🗺️ Índice</a></li>
+                <li><a href="01_arquitectura.html">🏗️ Arquitectura</a></li>
+                <li><a href="02_sistema_colas.html">🔄 Sistema de Colas</a></li>
+                <li><a href="03_paralelismo.html">⚡ Paralelismo</a></li>
+                <li><a href="04_flujos.html">📊 Flujos</a></li>
+                <li><a href="05_guia_desarrollo.html">🛠️ Desarrollo</a></li>
+                <li><a href="readme.html">📖 README</a></li>
+                <li><a href="testing.html">🧪 Testing</a></li>
+            </ul>
+        </aside>
+
+        <main class="content">
+            <h1>📚 Documentación del Sistema de Inventario</h1>
+
+<p>Bienvenido a la documentación del <strong>Sistema de Inventario con Procesamiento Asíncrono</strong>. Este sistema utiliza <strong>FastAPI</strong>, <strong>Redis</strong>, <strong>RQ (Redis Queue)</strong> y <strong>PostgreSQL</strong> para gestionar inventarios de productos y piezas con procesamiento en background.</p>
+
+<h2>🗺️ Mapa de Documentación</h2>
+
+<h3>Para Empezar</h3>
+<p>1. <strong><a href="README.md">README.md</a></strong> - Introducción rápida y quick start</p>
+<p>2. <strong><a href="01_ARQUITECTURA_GENERAL.md">01_ARQUITECTURA_GENERAL.md</a></strong> - Visión completa del sistema</p>
+
+<h3>Conceptos Clave ⭐</h3>
+<p>3. <strong><a href="02_SISTEMA_COLAS.md">02_SISTEMA_COLAS.md</a></strong> - Redis + RQ: Cómo funciona el encolado</p>
+<p>4. <strong><a href="03_PARALELISMO_CONCURRENCIA.md">03_PARALELISMO_CONCURRENCIA.md</a></strong> - API + Workers concurrentes</p>
+<p>5. <strong><a href="04_FLUJOS_INVENTARIO.md">04_FLUJOS_INVENTARIO.md</a></strong> - Diagramas de flujos de negocio</p>
+
+<h3>Para Desarrolladores</h3>
+<p>6. <strong><a href="05_GUIA_DESARROLLO.md">05_GUIA_DESARROLLO.md</a></strong> - Cómo extender el sistema</p>
+<p>7. <strong><a href="TESTING.md">TESTING.md</a></strong> - Pruebas automatizadas</p>
+
+<h2>🎯 Guías de Lectura por Perfil</h2>
+
+<h3>👨‍💻 Nuevo Desarrollador</h3>
+<p>> "Quiero entender cómo funciona el sistema"</p>
+
+<p>1. Lee <strong>README.md</strong> para entender qué hace el sistema</p>
+<p>2. Lee <strong>01_ARQUITECTURA_GENERAL.md</strong> para ver la estructura completa</p>
+<p>3. Lee <strong>02_SISTEMA_COLAS.md</strong> para entender el procesamiento asíncrono</p>
+<p>4. Lee <strong>03_PARALELISMO_CONCURRENCIA.md</strong> para entender la concurrencia</p>
+<p>5. Sigue <strong>05_GUIA_DESARROLLO.md</strong> para hacer tu primera contribución</p>
+
+<h3>🏗️ Arquitecto de Software</h3>
+<p>> "Necesito entender decisiones de diseño"</p>
+
+<p>1. <strong>01_ARQUITECTURA_GENERAL.md</strong> - Patrones y capas</p>
+<p>2. <strong>02_SISTEMA_COLAS.md</strong> - Por qué usar colas, escalabilidad</p>
+<p>3. <strong>03_PARALELISMO_CONCURRENCIA.md</strong> - Gestión de estado compartido</p>
+
+<h3>📊 Product Manager / Analista</h3>
+<p>> "Quiero entender los flujos de negocio"</p>
+
+<p>1. <strong>README.md</strong> - Funcionalidades principales</p>
+<p>2. <strong>04_FLUJOS_INVENTARIO.md</strong> - Diagramas de flujos detallados</p>
+
+<h3>🔧 DevOps / SRE</h3>
+<p>> "Necesito deployar y monitorear"</p>
+
+<p>1. <strong>README.md</strong> - Configuración de Docker Compose</p>
+<p>2. <strong>02_SISTEMA_COLAS.md</strong> - Monitoreo de colas y workers</p>
+<p>3. <strong>TESTING.md</strong> - Pruebas de integración</p>
+
+<h2>🔑 Conceptos Clave del Sistema</h2>
+
+<h3>Sistema de Colas (Redis + RQ)</h3>
+<p>El sistema utiliza <strong>colas de trabajo</strong> para procesar tareas lentas en background:</p>
+<ul>
+<li>✅ API responde rápido (no bloquea)</li>
+<li>✅ Workers procesan tareas asíncronamente</li>
+<li>✅ Escalable horizontalmente</li>
+</ul>
+
+<strong>Ejemplo:</strong> Solicitar piezas a proveedor
+<pre><code class="language-">Usuario → API → Encolar trabajo → Respuesta inmediata
+                     ↓
+                 Worker → Simula pedido → Actualiza inventario</code></pre>
+
+<h3>Paralelismo y Concurrencia</h3>
+<ul>
+<li><strong>API (FastAPI)</strong>: Maneja múltiples requests simultáneos</li>
+<li><strong>Workers (RQ)</strong>: Procesan trabajos en paralelo</li>
+<li><strong>PostgreSQL</strong>: Fuente de verdad compartida</li>
+</ul>
+
+<h3>Arquitectura por Capas</h3>
+<pre><code class="language-">API Layer       → Controllers (app/api/)
+Service Layer   → Business Logic (app/services/)
+Repository Layer → Data Access (app/repositories/)
+Domain Layer    → Core Logic (app/domain/)</code></pre>
+
+<h2>📦 Componentes del Sistema</h2>
+
+<p>| Componente | Tecnología | Puerto | Descripción |</p>
+<p>|------------|------------|--------|-------------|</p>
+<p>| <strong>API</strong> | FastAPI + Uvicorn | 5050 | Endpoints REST |</p>
+<p>| <strong>Worker</strong> | RQ | - | Procesamiento asíncrono |</p>
+<p>| <strong>Redis</strong> | Redis 7 | 6379 | Cola de mensajes |</p>
+<p>| <strong>DB</strong> | PostgreSQL 15 | 5434 (HOST_POSTGRES_PORT) | Base de datos |</p>
+
+<h2>🚀 Quick Start</h2>
+
+<pre><code class="language-bash"><h1>1. Levantar servicios</h1>
+# Si tienes otro Postgres local en el mismo puerto, cambia HOST_POSTGRES_PORT en .env
+docker compose up --build
+
+<h1>2. Crear tablas</h1>
+docker compose exec api python -m app.cli create-db
+
+<h1>3. Cargar datos de ejemplo</h1>
+docker compose exec api python -m app.cli seed-db
+
+<h1>4. Probar API</h1>
+curl http://localhost:5050/health
+curl http://localhost:5050/api/productos</code></pre>
+
+<h2>📖 Estructura de Documentos</h2>
+
+<h3>01_ARQUITECTURA_GENERAL.md</h3>
+<ul>
+<li>Diagrama de arquitectura completa</li>
+<li>Componentes y responsabilidades</li>
+<li>Patrones de diseño</li>
+<li>Flujo de datos</li>
+</ul>
+
+<h3>02_SISTEMA_COLAS.md</h3>
+<ul>
+<li>¿Qué es RQ y por qué usarlo?</li>
+<li>Arquitectura de colas (productor/consumidor)</li>
+<li>Workers en detalle</li>
+<li>Ejemplos prácticos</li>
+<li>Monitoreo</li>
+</ul>
+
+<h3>03_PARALELISMO_CONCURRENCIA.md</h3>
+<ul>
+<li>Diferencia paralelismo vs concurrencia</li>
+<li>API + Workers ejecutando en paralelo</li>
+<li>Gestión de estado compartido</li>
+<li>Escalabilidad horizontal</li>
+</ul>
+
+<h3>04_FLUJOS_INVENTARIO.md</h3>
+<ul>
+<li>Flujo de solicitud de pieza asíncrona</li>
+<li>Flujo de orden de fabricación</li>
+<li>Flujo de ingreso de productos</li>
+<li>Flujo de reservas/despachos (ventas)</li>
+</ul>
+
+<h3>05_GUIA_DESARROLLO.md</h3>
+<ul>
+<li>Cómo agregar un nuevo worker</li>
+<li>Cómo agregar un endpoint asíncrono</li>
+<li>Cómo testear workers</li>
+<li>Patrones recomendados</li>
+</ul>
+
+<h2>🔍 Búsqueda Rápida</h2>
+
+<strong>¿Cómo funciona el encolado?</strong> → <a href="02_SISTEMA_COLAS.md">02_SISTEMA_COLAS.md</a>
+
+<strong>¿Cómo escala el sistema?</strong> → <a href="03_PARALELISMO_CONCURRENCIA.md">03_PARALELISMO_CONCURRENCIA.md</a>
+
+<strong>¿Cómo fluyen las órdenes?</strong> → <a href="04_FLUJOS_INVENTARIO.md">04_FLUJOS_INVENTARIO.md</a>
+
+<strong>¿Cómo agrego funcionalidad?</strong> → <a href="05_GUIA_DESARROLLO.md">05_GUIA_DESARROLLO.md</a>
+
+<strong>¿Cómo pruebo el sistema?</strong> → <a href="TESTING.md">TESTING.md</a>
+
+<h2>🎓 Recursos Adicionales</h2>
+
+<ul>
+<li><strong>Código fuente</strong>: <code>app/</code> (comentado y documentado)</li>
+<li><strong>Configuración</strong>: <code>.env.example</code>, <code>docker-compose.yml</code></li>
+<li><strong>Tests</strong>: <code>tests/</code></li>
+</ul>
+
+<h2>💡 Filosofía del Sistema</h2>
+
+<p>Este sistema fue diseñado siguiendo principios de:</p>
+<ul>
+<li>✅ <strong>Separación de responsabilidades</strong>: Capas bien definidas</li>
+<li>✅ <strong>Procesamiento asíncrono</strong>: Tareas lentas no bloquean la API</li>
+<li>✅ <strong>Escalabilidad</strong>: Workers y API pueden escalar independientemente</li>
+<li>✅ <strong>Mantenibilidad</strong>: Código organizado por dominio</li>
+<li>✅ <strong>Testabilidad</strong>: Servicios inyectables y mockeables</li>
+</ul>
+
+<p>---</p>
+
+<strong>¿Nuevo en el proyecto?</strong> Comienza por <strong><a href="README.md">README.md</a></strong> y luego lee <strong><a href="01_ARQUITECTURA_GENERAL.md">01_ARQUITECTURA_GENERAL.md</a></strong>
+
+<strong>¿Listo para codear?</strong> Ve directamente a <strong><a href="05_GUIA_DESARROLLO.md">05_GUIA_DESARROLLO.md</a></strong>
+
+        </main>
+    </div>
+
+    <footer class="footer">
+        <p>Desarrollado con ❤️ usando FastAPI, Redis, RQ y PostgreSQL</p>
+        <p><a href="../index.html">← Volver al índice</a></p>
+    </footer>
+
+    <script>
+        hljs.highlightAll();
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</body>
+</html>

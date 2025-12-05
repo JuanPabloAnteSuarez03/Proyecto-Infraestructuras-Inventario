@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏗️ Arquitectura General del Sistema - Sistema de Inventario</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        
+:root {
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --secondary: #8b5cf6;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --dark: #1e293b;
+    --gray: #64748b;
+    --light: #f1f5f9;
+    --white: #ffffff;
+    --border: #e2e8f0;
+    --code-bg: #282c34;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: var(--light);
+    color: var(--dark);
+    line-height: 1.7;
+}
+
+.navbar {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.nav-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-brand {
+    color: var(--white);
+    font-size: 1.25rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.nav-links {
+    display: flex;
+    gap: 24px;
+}
+
+.nav-links a {
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.3s;
+}
+
+.nav-links a:hover {
+    color: var(--white);
+}
+
+.container {
+    max-width: 1400px;
+    margin: 40px auto;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 40px;
+    padding: 0 24px;
+}
+
+.sidebar {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 24px;
+    height: fit-content;
+    position: sticky;
+    top: 100px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+.sidebar h3 {
+    color: var(--dark);
+    font-size: 1.1rem;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid var(--primary);
+}
+
+.sidebar-menu {
+    list-style: none;
+}
+
+.sidebar-menu li {
+    margin-bottom: 8px;
+}
+
+.sidebar-menu a {
+    display: block;
+    padding: 10px 12px;
+    color: var(--gray);
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.3s;
+    font-size: 0.95rem;
+}
+
+.sidebar-menu a:hover {
+    background: var(--primary);
+    color: var(--white);
+    transform: translateX(4px);
+}
+
+.content {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 40px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    min-height: 600px;
+}
+
+.content h1 {
+    color: var(--dark);
+    font-size: 2.5rem;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 3px solid var(--primary);
+}
+
+.content h2 {
+    color: var(--dark);
+    font-size: 2rem;
+    margin-top: 40px;
+    margin-bottom: 20px;
+    padding-left: 12px;
+    border-left: 4px solid var(--primary);
+}
+
+.content h3 {
+    color: var(--dark);
+    font-size: 1.5rem;
+    margin-top: 32px;
+    margin-bottom: 16px;
+}
+
+.content p {
+    margin-bottom: 16px;
+    color: var(--gray);
+}
+
+.content ul, .content ol {
+    margin: 16px 0 16px 24px;
+    color: var(--gray);
+}
+
+.content li {
+    margin-bottom: 8px;
+}
+
+.content a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.content a:hover {
+    text-decoration: underline;
+}
+
+.content code {
+    font-family: 'Fira Code', monospace;
+    background: var(--light);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: var(--danger);
+}
+
+.content pre {
+    background: var(--code-bg);
+    border-radius: 8px;
+    padding: 20px;
+    overflow-x: auto;
+    margin: 20px 0;
+}
+
+.content pre code {
+    background: none;
+    color: #abb2bf;
+    padding: 0;
+}
+
+.content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 24px 0;
+}
+
+.content th {
+    background: var(--primary);
+    color: var(--white);
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+}
+
+.content td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.content tr:hover {
+    background: var(--light);
+}
+
+.content blockquote {
+    border-left: 4px solid var(--primary);
+    padding: 16px 20px;
+    margin: 20px 0;
+    background: var(--light);
+    border-radius: 0 8px 8px 0;
+}
+
+.footer {
+    text-align: center;
+    padding: 40px 24px;
+    color: var(--gray);
+}
+
+.footer a {
+    color: var(--primary);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+@media (max-width: 1024px) {
+    .container {
+        grid-template-columns: 1fr;
+    }
+
+    .sidebar {
+        position: relative;
+        top: 0;
+    }
+}
+
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="../index.html" class="nav-brand">📚 Documentación Inventario</a>
+            <div class="nav-links">
+                <a href="../index.html">🏠 Inicio</a>
+                <a href="00_indice.html">📑 Índice</a>
+                <a href="https://github.com" target="_blank">💻 GitHub</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <aside class="sidebar">
+            <h3>📖 Navegación</h3>
+            <ul class="sidebar-menu">
+                <li><a href="00_indice.html">🗺️ Índice</a></li>
+                <li><a href="01_arquitectura.html">🏗️ Arquitectura</a></li>
+                <li><a href="02_sistema_colas.html">🔄 Sistema de Colas</a></li>
+                <li><a href="03_paralelismo.html">⚡ Paralelismo</a></li>
+                <li><a href="04_flujos.html">📊 Flujos</a></li>
+                <li><a href="05_guia_desarrollo.html">🛠️ Desarrollo</a></li>
+                <li><a href="readme.html">📖 README</a></li>
+                <li><a href="testing.html">🧪 Testing</a></li>
+            </ul>
+        </aside>
+
+        <main class="content">
+            <h1>🏗️ Arquitectura General del Sistema</h1>
+
+<h2>Visión General</h2>
+
+<p>Este es un <strong>microservicio de inventario</strong> construido con FastAPI que gestiona productos, piezas, proveedores y órdenes de fabricación. El sistema utiliza <strong>procesamiento asíncrono</strong> mediante colas de trabajo (Redis + RQ) para manejar tareas que requieren tiempo sin bloquear la API.</p>
+
+<h2>Diagrama de Arquitectura Completa</h2>
+
+<pre><code class="language-mermaid">graph TB
+    subgraph "Cliente"
+        CLIENT[Cliente HTTP]
+    end
+
+    subgraph "Docker Compose"
+        subgraph "Contenedor API"
+            API[FastAPI + Uvicorn<br/>Puerto 5050]
+            CONTROLLERS[Controllers<br/>app/api/]
+            SERVICES[Services<br/>app/services/]
+            REPOS[Repositories<br/>app/repositories/]
+        end
+
+        subgraph "Contenedor Worker"
+            WORKER[RQ Worker]
+            TASKS[Task Functions<br/>app/tasks.py]
+        end
+
+        subgraph "Contenedor Redis"
+            REDIS[(Redis Queue<br/>Puerto 6379)]
+        end
+
+        subgraph "Contenedor PostgreSQL"
+            DB[(PostgreSQL 15<br/>Puerto 5434)]
+        end
+    end
+
+    CLIENT -->|HTTP Request| API
+    API --> CONTROLLERS
+    CONTROLLERS --> SERVICES
+    SERVICES --> REPOS
+    REPOS --> DB
+
+    SERVICES -->|queue.enqueue()| REDIS
+    REDIS -->|Consume jobs| WORKER
+    WORKER --> TASKS
+    TASKS --> REPOS
+    REPOS --> DB
+
+    API -->|Respuesta rápida| CLIENT
+    WORKER -.->|Actualiza estado| DB</code></pre>
+
+<h2>Componentes Principales</h2>
+
+<h3>1. API (FastAPI + Uvicorn)</h3>
+
+<strong>Responsabilidades:</strong>
+<ul>
+<li>Recibir solicitudes HTTP</li>
+<li>Validar datos de entrada (Pydantic)</li>
+<li>Orquestar servicios</li>
+<li>Encolar trabajos pesados en Redis</li>
+<li>Responder rápidamente al cliente</li>
+</ul>
+
+<strong>Puerto:</strong> 5050 (expuesto), 5000 (interno)
+
+<strong>Tecnologías:</strong>
+<ul>
+<li>FastAPI (framework)</li>
+<li>Uvicorn (ASGI server)</li>
+<li>Pydantic (validación)</li>
+<li>SQLAlchemy (ORM)</li>
+</ul>
+
+<strong>Código:</strong> <code>app/api/<em>.py</code>
+
+<h3>2. Worker (RQ)</h3>
+
+<strong>Responsabilidades:</strong>
+<ul>
+<li>Consumir trabajos de la cola Redis</li>
+<li>Ejecutar tareas en background</li>
+<li>Actualizar base de datos con resultados</li>
+<li>Manejar errores y reintentos</li>
+</ul>
+
+<strong>Proceso:</strong> Separado del API container
+
+<strong>Tecnologías:</strong>
+<ul>
+<li>RQ (Redis Queue)</li>
+<li>Redis (broker)</li>
+</ul>
+
+<strong>Código:</strong> <code>app/tasks.py</code>
+
+<strong>Workers definidos:</strong>
+<ul>
+<li><code>procesar_solicitud_pieza</code>: Simula pedido a proveedor</li>
+<li><code>procesar_orden_fabricacion</code>: Consume piezas de órdenes confirmadas</li>
+</ul>
+
+<h3>3. Redis</h3>
+
+<strong>Responsabilidades:</strong>
+<ul>
+<li>Almacenar cola de trabajos</li>
+<li>Comunicar API ↔ Workers</li>
+<li>Persistir estado de trabajos</li>
+</ul>
+
+<strong>Puerto:</strong> 6379
+
+<strong>Cola:</strong> <code>default</code>
+
+<h3>4. PostgreSQL</h3>
+
+<strong>Responsabilidades:</strong>
+<ul>
+<li>Persistir datos (productos, piezas, proveedores, órdenes, solicitudes)</li>
+<li>Fuente de verdad compartida entre API y Workers</li>
+<li>Transacciones ACID</li>
+</ul>
+
+<strong>Puerto:</strong> 5434 (expuesto vía <code>HOST_POSTGRES_PORT</code>), 5432 (interno)
+
+<strong>Tablas principales:</strong>
+<ul>
+<li><code>inventario_productos</code></li>
+<li><code>inventario_piezas</code></li>
+<li><code>proveedores</code></li>
+<li><code>ordenes_fabricacion</code></li>
+<li><code>solicitudes_pieza</code></li>
+<li><code>movimientos</code></li>
+</ul>
+
+<h2>Arquitectura por Capas</h2>
+
+<p>El código sigue una arquitectura en capas para separar responsabilidades:</p>
+
+<pre><code class="language-">┌─────────────────────────────────────────┐
+│  API Layer (app/api/)                   │  ← Controllers FastAPI
+│  - Recibe requests HTTP                 │
+│  - Valida con Pydantic                  │
+│  - Delega a Service Layer               │
+└─────────────────────────────────────────┘
+            ↓
+┌─────────────────────────────────────────┐
+│  Service Layer (app/services/)          │  ← Lógica de negocio
+│  - Reglas de negocio                    │
+│  - Orquestación                         │
+│  - Encolado de trabajos                 │
+└─────────────────────────────────────────┘
+            ↓
+┌─────────────────────────────────────────┐
+│  Repository Layer (app/repositories/)   │  ← Acceso a datos
+│  - CRUD operations                      │
+│  - Queries SQLAlchemy                   │
+│  - Abstracción de BD                    │
+└─────────────────────────────────────────┘
+            ↓
+┌─────────────────────────────────────────┐
+│  Domain Layer (app/domain/)             │  ← Lógica pura
+│  - Constantes                           │
+│  - Normalizadores                       │
+│  - Planes sin I/O                       │
+└─────────────────────────────────────────┘</code></pre>
+
+<h3>Ventajas de esta arquitectura:</h3>
+<ul>
+<li>✅ <strong>Separación de responsabilidades</strong>: Cada capa tiene un propósito claro</li>
+<li>✅ <strong>Testabilidad</strong>: Servicios inyectables y mockeables</li>
+<li>✅ <strong>Mantenibilidad</strong>: Cambios en una capa no afectan otras</li>
+<li>✅ <strong>Escalabilidad</strong>: Capas pueden optimizarse independientemente</li>
+</ul>
+
+<h2>Organización de Servicios por Dominio</h2>
+
+<p>Los servicios están organizados por dominios de negocio:</p>
+
+<pre><code class="language-">app/services/
+├── inventario/
+│   ├── productos_service.py              # Gestión de productos
+│   ├── piezas_service.py                 # Gestión de piezas
+│   ├── movimientos_service.py            # Registro de movimientos
+│   └── productos_manufacturing_helper.py # Helper de fabricación
+├── fabricacion/
+│   ├── fabricacion_service.py            # Planes de fabricación
+│   ├── ordenes_service.py                # Órdenes de fabricación
+│   ├── entregas_service.py               # Acumulación de entregas
+│   └── fabricacion_orchestrator.py       # Orquestador de órdenes
+└── proveedores/
+    ├── proveedores_service.py            # Gestión de proveedores
+    └── solicitudes_service.py            # Solicitudes de piezas</code></pre>
+
+<h3>Dominio: Inventario</h3>
+<p>Gestiona el inventario de productos terminados y piezas.</p>
+
+<strong>Productos:</strong>
+<ul>
+<li>Códigos: <code>S1</code>, <code>S2</code></li>
+<li>Estados: <code>Disponible</code>, <code>Reservado</code>, <code>A Despacho</code></li>
+<li>Operaciones: transferencias, reservas, despachos, ingresos</li>
+</ul>
+
+<strong>Piezas:</strong>
+<ul>
+<li>IDs: <code>P1</code>, <code>P2</code>, <code>P3</code>, <code>P4</code>, <code>P5</code>, <code>P6</code></li>
+<li>Vinculadas a proveedores</li>
+<li>Consumidas durante fabricación</li>
+</ul>
+
+<h3>Dominio: Fabricación</h3>
+<p>Coordina la producción de productos.</p>
+
+<strong>Responsabilidades:</strong>
+<ul>
+<li>Calcular materiales necesarios</li>
+<li>Verificar disponibilidad de piezas</li>
+<li>Confirmar fabricación con servicio externo</li>
+<li>Consumir piezas del inventario</li>
+<li>Completar órdenes cuando llegan productos</li>
+</ul>
+
+<h3>Dominio: Proveedores</h3>
+<p>Gestiona proveedores y solicitudes de piezas.</p>
+
+<strong>Responsabilidades:</strong>
+<ul>
+<li>CRUD de proveedores</li>
+<li>Solicitudes síncronas (respuesta inmediata)</li>
+<li>Solicitudes asíncronas (encoladas con RQ)</li>
+</ul>
+
+<h2>Flujo de Datos</h2>
+
+<h3>Flujo Síncrono (Respuesta inmediata)</h3>
+
+<pre><code class="language-">Cliente → API → Service → Repository → DB
+                                          ↓
+Cliente ← API ← Service ← Repository ← Query Result</code></pre>
+
+<strong>Ejemplo:</strong> <code>GET /api/productos</code>
+<p>1. Cliente hace request</p>
+<p>2. Controller llama a <code>ProductosService.list()</code></p>
+<p>3. Service llama a <code>ProductosRepository.get_all()</code></p>
+<p>4. Repository consulta PostgreSQL</p>
+<p>5. Datos regresan por la cadena</p>
+<p>6. API responde JSON al cliente</p>
+
+<strong>Tiempo de respuesta:</strong> ~10-100ms
+
+<h3>Flujo Asíncrono (Con cola)</h3>
+
+<pre><code class="language-">Cliente → API → Service → queue.enqueue() → Redis
+         ↓                                    ↓
+    Respuesta                            Worker consume
+    inmediata                                 ↓
+                                    Ejecuta tarea → DB</code></pre>
+
+<strong>Ejemplo:</strong> <code>POST /api/proveedores/solicitudes_async</code>
+<p>1. Cliente hace request</p>
+<p>2. Service crea registro de solicitud</p>
+<p>3. Service encola trabajo: <code>queue.enqueue(procesar_solicitud_pieza, solicitud_id)</code></p>
+<p>4. API responde inmediatamente: <code>{"id": 1, "estado": "pendiente"}</code></p>
+<p>5. Worker RQ consume el trabajo de Redis</p>
+<p>6. Worker ejecuta <code>procesar_solicitud_pieza()</code></p>
+<p>7. Worker actualiza solicitud a <code>"completada"</code> y suma piezas</p>
+
+<strong>Tiempo de respuesta API:</strong> ~50-200ms  
+<strong>Tiempo total de procesamiento:</strong> Depende del worker
+
+<h2>Patrones de Diseño Aplicados</h2>
+
+<h3>1. Repository Pattern</h3>
+<p>Abstrae el acceso a datos.</p>
+
+<pre><code class="language-python"><h1>app/repositories/productos_repository.py</h1>
+class InventarioProductosRepository:
+    def get_by_codigo_estado(self, codigo, estado):
+        return self.session.query(InventarioProducto)\
+            .filter_by(id_producto=codigo, estado=estado).first()</code></pre>
+
+<strong>Ventajas:</strong>
+<ul>
+<li>Cambiar ORM sin afectar servicios</li>
+<li>Testing con mocks más fácil</li>
+</ul>
+
+<h3>2. Service Layer Pattern</h3>
+<p>Encapsula lógica de negocio.</p>
+
+<pre><code class="language-python"><h1>app/services/inventario/productos_service.py</h1>
+class InventarioProductosService:
+    def reservar_stock(self, codigo, cantidad):
+        # Reglas de negocio aquí
+        disponible = self.repo.get_by_codigo_estado(codigo, "Disponible")
+        if disponible.cantidad < cantidad:
+            # Lógica de fabricación</code></pre>
+
+<h3>3. Dependency Injection</h3>
+<p>Servicios reciben dependencias por constructor.</p>
+
+<pre><code class="language-python">class ProductosService:
+    def __init__(self, session, piezas_repository=None):
+        self.session = session
+        self.piezas_repo = piezas_repository or InventarioPiezasRepository(session)</code></pre>
+
+<strong>Ventajas:</strong>
+<ul>
+<li>Testing con mocks</li>
+<li>Flexibilidad</li>
+</ul>
+
+<h3>4. Producer-Consumer (Colas)</h3>
+<p>API produce trabajos, Workers consumen.</p>
+
+<pre><code class="language-python"><h1>Producer (API)</h1>
+queue.enqueue(procesar_solicitud_pieza, solicitud_id)
+
+<h1>Consumer (Worker)</h1>
+def procesar_solicitud_pieza(solicitud_id):
+    # Procesar trabajo</code></pre>
+
+<h2>Gestión de Estado</h2>
+
+<h3>Estados de Solicitudes de Pieza</h3>
+<pre><code class="language-">pendiente → en_proceso → completada
+                      ↘ fallida</code></pre>
+
+<h3>Estados de Órdenes de Fabricación</h3>
+<pre><code class="language-">calculando → confirmando → confirmado → consumiendo_piezas → 
+    esperando_fabricacion → completada
+         ↓
+   confirmacion_fallida → fallida</code></pre>
+
+<h3>Estados de Inventario de Productos</h3>
+<pre><code class="language-">Disponible ←→ Reservado ←→ A Despacho
+     ↑                          ↓
+     └─────── (despacho) ───────┘</code></pre>
+
+<h2>Transacciones y Consistencia</h2>
+
+<h3>Transacciones en API</h3>
+<pre><code class="language-python">@router.post("/api/productos/transferencias")
+def transferir(body, db: Session):
+    service = ProductosService(db)
+    resultado = service.transferir_stock(...)
+    # Session.commit() se hace en el servicio
+    return resultado</code></pre>
+
+<h3>Transacciones en Workers</h3>
+<pre><code class="language-python">def procesar_solicitud_pieza(solicitud_id):
+    session = _ensure_session()
+    try:
+        # Múltiples updates
+        solicitud.estado = "en_proceso"
+        session.commit()
+        # ... más trabajo ...
+        pieza.cantidad += solicitud.cantidad
+        session.commit()
+    finally:
+        session.close()</code></pre>
+
+<h2>Escalabilidad</h2>
+
+<h3>Escalado Horizontal</h3>
+
+<strong>API:</strong>
+<pre><code class="language-bash"><h1>docker-compose.yml</h1>
+services:
+  api:
+    deploy:
+      replicas: 3  # 3 instancias de API</code></pre>
+
+<strong>Workers:</strong>
+<pre><code class="language-bash"><h1>docker-compose.yml</h1>
+services:
+  worker:
+    deploy:
+      replicas: 5  # 5 workers procesando en paralelo</code></pre>
+
+<h3>Escalado Vertical</h3>
+<ul>
+<li>Aumentar recursos de contenedores</li>
+<li>Configurar pool de conexiones PostgreSQL</li>
+</ul>
+
+<h2>Manejo de Errores</h2>
+
+<h3>En API</h3>
+<pre><code class="language-python">try:
+    resultado = service.hacer_algo()
+    return resultado
+except ValueError as exc:
+    raise HTTPException(status_code=400, detail=str(exc))</code></pre>
+
+<h3>En Workers</h3>
+<pre><code class="language-python">def procesar_orden_fabricacion(orden_id):
+    try:
+        # Procesamiento
+    except Exception as exc:
+        orden.estado = "fallida"
+        orden.detalle = {"error": str(exc)}
+        session.commit()</code></pre>
+
+<h2>Monitoreo y Logging</h2>
+
+<h3>Logs de API</h3>
+<pre><code class="language-bash">docker compose logs -f api</code></pre>
+
+<h3>Logs de Workers</h3>
+<pre><code class="language-bash">docker compose logs -f worker</code></pre>
+
+<h3>Inspeccionar Redis</h3>
+<pre><code class="language-bash">docker compose exec redis redis-cli
+<blockquote>LLEN rq:queue:default  # Ver cantidad de trabajos en cola</blockquote>
+<blockquote>KEYS rq:</em>              # Ver todas las keys de RQ</code></pre></blockquote>
+
+<h2>Archivos de Configuración Clave</h2>
+
+<p>| Archivo | Propósito |</p>
+<p>|---------|-----------|</p>
+<p>| <code>docker-compose.yml</code> | Orquestación de contenedores |</p>
+<p>| <code>.env</code> | Variables de entorno |</p>
+<p>| <code>app/__init__.py</code> | Inicialización de FastAPI |</p>
+<p>| <code>app/database.py</code> | Configuración de SQLAlchemy |</p>
+<p>| <code>app/routes.py</code> | Registro de routers |</p>
+<p>| <code>app/tasks.py</code> | Definición de workers |</p>
+<p>| <code>main.py</code> | Entry point de la aplicación |</p>
+
+<h2>Próximos Pasos</h2>
+
+<p>Ahora que entiendes la arquitectura general:</p>
+
+<p>1. <strong>Profundiza en colas:</strong> Lee <a href="02_SISTEMA_COLAS.md">02_SISTEMA_COLAS.md</a></p>
+<p>2. <strong>Entiende concurrencia:</strong> Lee <a href="03_PARALELISMO_CONCURRENCIA.md">03_PARALELISMO_CONCURRENCIA.md</a></p>
+<p>3. <strong>Aprende los flujos:</strong> Lee <a href="04_FLUJOS_INVENTARIO.md">04_FLUJOS_INVENTARIO.md</a></p>
+<p>4. <strong>Empieza a desarrollar:</strong> Lee <a href="05_GUIA_DESARROLLO.md">05_GUIA_DESARROLLO.md</a></p>
+
+        </main>
+    </div>
+
+    <footer class="footer">
+        <p>Desarrollado con ❤️ usando FastAPI, Redis, RQ y PostgreSQL</p>
+        <p><a href="../index.html">← Volver al índice</a></p>
+    </footer>
+
+    <script>
+        hljs.highlightAll();
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+</body>
+</html>
