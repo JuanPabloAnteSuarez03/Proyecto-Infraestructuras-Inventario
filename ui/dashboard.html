@@ -372,6 +372,33 @@
           getJson(`${host}/api/proveedores/solicitudes_async`),
           getJson(`${host}/api/fabricacion/ordenes`),
         ]);
+
+        // Solicitudes pedidas por el orquestador (en detalle de cada orden)
+        const solicitudesPorOrden = [];
+        ord.forEach(o => {
+          const lista = Array.isArray(o.detalle?.solicitudes_piezas) ? o.detalle.solicitudes_piezas : [];
+          lista.forEach((s, idx) => {
+            solicitudesPorOrden.push({
+              id: `${o.id}-${idx + 1}`,
+              orden: o.id,
+              id_pieza: s.id_pieza,
+              cantidad: s.cantidad,
+              estado: `orden ${o.estado}`,
+              tiempo_entrega: s.tiempo_entrega ?? null,
+            });
+          });
+        });
+        const solicitudesCombinadas = [
+          ...sol.map(s => ({
+            id: s.id,
+            orden: "-",
+            id_pieza: s.id_pieza,
+            cantidad: s.cantidad,
+            estado: s.estado,
+            tiempo_entrega: s.tiempo_estimado || s.tiempo_entrega || null,
+          })),
+          ...solicitudesPorOrden,
+        ];
         // KPIs
         const s1 = prod.find(p => p.id_producto === "S1" && p.estado === "Disponible");
         const s2 = prod.find(p => p.id_producto === "S2" && p.estado === "Disponible");
@@ -392,7 +419,7 @@
 
         renderProductos(prod);
         renderPiezas(piezas);
-        renderSolicitudes(sol);
+        renderSolicitudes(solicitudesCombinadas);
         renderOrdenes(ord);
       } catch (err) {
         log(`Error refrescando: ${err.message}`);
@@ -411,8 +438,11 @@
     }
     function renderSolicitudes(items) {
       const t = document.getElementById("tbl-solicitudes");
-      t.innerHTML = "<tr><th>ID</th><th>Pieza</th><th>Cant</th><th>Estado</th></tr>" +
-        items.map(s => `<tr><td>${s.id}</td><td>${s.id_pieza}</td><td>${s.cantidad}</td><td>${s.estado}</td></tr>`).join("");
+      t.innerHTML = "<tr><th>ID</th><th>Orden</th><th>Pieza</th><th>Cant</th><th>Estado</th><th>ETA</th></tr>" +
+        items.map(s => {
+          const eta = s.tiempo_entrega ? `${s.tiempo_entrega}` : "-";
+          return `<tr><td>${s.id}</td><td>${s.orden}</td><td>${s.id_pieza}</td><td>${s.cantidad}</td><td>${s.estado || '-'}</td><td>${eta}</td></tr>`;
+        }).join("");
     }
     function renderOrdenes(items) {
       const t = document.getElementById("tbl-ordenes");
@@ -451,29 +481,8 @@
         }).join("");
     }
 
-    async function encolarSolicitudesDesdePlan(codigo, cantidad) {
-      log(`🔄 GET ${host}/api/fabricacion/plan/${codigo}?cantidad=${cantidad}`, "send");
-      const plan = await getJson(`${host}/api/fabricacion/plan/${codigo}?cantidad=${cantidad}`);
-      log(`   ⏱️ Tiempo: ${plan.tiempo_estimado}min | Materiales: ${plan.materiales.length}`, "inv");
-
-      const solicitudes = [];
-      for (const m of plan.materiales) {
-        const faltante = Math.max(m.cantidad_requerida - m.cantidad_disponible, 0);
-        if (faltante > 0) {
-          log(`🔄 POST ${host}/api/proveedores/solicitudes_async - Pieza ${m.id_pieza} x${faltante}`, "send");
-          const resp = await getJson(`${host}/api/proveedores/solicitudes_async`, {
-            method: "POST",
-            headers: {"Content-Type":"application/json"},
-            body: JSON.stringify({id_pieza: m.id_pieza, cantidad: faltante})
-          });
-          solicitudes.push(resp.id);
-          log(`   ✅ Solicitud #${resp.id} encolada (estado: ${resp.estado})`, "inv");
-        } else {
-          log(`   ℹ️ ${m.id_pieza}: stock suficiente (${m.cantidad_disponible} disponible)`, "inv");
-        }
-      }
-      return solicitudes;
-    }
+    // Las solicitudes de piezas ahora las maneja el orquestador al crear la orden,
+    // para evitar duplicados y desbalances en el inventario.
 
     async function encolarOrden(codigo, cantidad) {
       log(`🔄 POST ${host}/api/fabricacion/ordenes - ${codigo} x${cantidad}`, "send");
@@ -506,14 +515,11 @@
 
     async function simularOrdenes() {
       try {
-        log("🚀 Simulación completa: Calculando faltantes y encolando S1 y S2...", "inv");
+        log("🚀 Simulación completa: encolando S1 y S2...", "inv");
         const qty1 = parseInt(document.getElementById("qty-s1").value);
         const qty2 = parseInt(document.getElementById("qty-s2").value);
-        const s1Sol = await encolarSolicitudesDesdePlan("S1", qty1);
-        const s2Sol = await encolarSolicitudesDesdePlan("S2", qty2);
         const ordenS1 = await encolarOrden("S1", qty1);
         const ordenS2 = await encolarOrden("S2", qty2);
-        log(`✅ Solicitudes S1: [${s1Sol.join(",")}] | S2: [${s2Sol.join(",")}]`, "inv");
         log(`✅ Órdenes encoladas -> S1: ${ordenS1}, S2: ${ordenS2}`, "inv");
         refresh();
       } catch (err) {
@@ -525,9 +531,8 @@
       try {
         const qty = parseInt(document.getElementById(`qty-${codigo.toLowerCase()}`).value);
         log(`📦 Encolando orden individual: ${codigo} x${qty}...`);
-        const solicitudes = await encolarSolicitudesDesdePlan(codigo, qty);
         const ordenId = await encolarOrden(codigo, qty);
-        log(`✅ ${codigo}: Orden ${ordenId} encolada | Solicitudes: [${solicitudes.join(",")}]`);
+        log(`✅ ${codigo}: Orden ${ordenId} encolada (piezas solicitadas y descontadas por orquestador)`);
         refresh();
       } catch (err) {
         log(`❌ Error encolando ${codigo}: ${err.message}`);
@@ -587,7 +592,7 @@
       }
     }
 
-    setInterval(refresh, 8000);  // Reducido de 3s a 8s para evitar concurrencia
+    setInterval(refresh, 2000);  // Poll más frecuente para ver cambios de inventario en tiempo casi real
     // Para no spamear el servicio externo, quitamos el polling automático (solo manual o carga inicial)
     refresh();
     verificarServicioExterno();  // una sola verificación inicial; el botón "Probar" repite la llamada

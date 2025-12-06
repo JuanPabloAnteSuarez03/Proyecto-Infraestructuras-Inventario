@@ -17,6 +17,7 @@ from app.services import (
     FabricacionService,
 )
 from app.repositories import InventarioPiezasRepository
+from app.models import InventarioPieza
 
 redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
 redis_conn = redis.from_url(redis_url)
@@ -87,67 +88,91 @@ def procesar_orden_fabricacion(orden_id: int) -> None:
     try:
         ordenes_service = OrdenesFabricacionService(session)
         fabricacion_service = FabricacionService()
-        piezas_repo = InventarioPiezasRepository(session)
+        proveedores_service = ProveedoresService(session, piezas_repository=InventarioPiezasRepository(session))
         orden = ordenes_service.retrieve(orden_id)
         if not orden:
             return
 
         print(f"[WORKER] Procesando orden #{orden_id}: {orden.id_producto} x{orden.cantidad}")
 
-        # Si la orden ya fue confirmada con fábrica externa
-        if orden.estado == "confirmado":
-            print(f"[WORKER] ✓ Orden #{orden_id} ya confirmada con fábrica externa")
-            orden.estado = "consumiendo_piezas"
-            session.commit()
-
-            plan = fabricacion_service.solicitar_plan(orden.id_producto, orden.cantidad)
-            print(f"[WORKER DEBUG] Plan materiales: {plan.materiales}")
-
-            for material in plan.materiales:
-                print(f"[WORKER DEBUG] Procesando material: {material}")
-                pieza = piezas_repo.get_by_id(material["id_pieza"])
-                print(f"[WORKER DEBUG] Pieza encontrada: {pieza}")
-                if pieza:
-                    print(f"[WORKER DEBUG] Cantidad antes: {pieza.cantidad}")
-                    pieza.cantidad -= material["cantidad"]
-                    print(f"[WORKER] Consumido {material['cantidad']} x {material['id_pieza']}")
-                    print(f"[WORKER DEBUG] Cantidad después: {pieza.cantidad}")
-                else:
-                    print(f"[WORKER DEBUG] ⚠️ Pieza {material['id_pieza']} no encontrada en DB")
-
-            session.commit()
-
+        detalle_orden = orden.detalle if isinstance(orden.detalle, dict) else {}
+        detalle_orden.setdefault("solicitudes_piezas", [])
+        detalle_orden.setdefault("consumo_piezas", [])
+        piezas_solicitadas = {s.get("id_pieza") for s in detalle_orden["solicitudes_piezas"] if isinstance(s, dict)}
+        if detalle_orden.get("consumido_en_orquestador"):
+            print(f"[WORKER] ℹ️ Orden #{orden_id} ya consumió piezas en el orquestador; se omite en worker.")
             orden.estado = "esperando_fabricacion"
-            session.commit()
-            print(f"[WORKER] 📤 Piezas consumidas. Esperando productos de fábrica externa")
-            print(f"[WORKER] ⏳ Fábrica debe llamar POST /api/fabricacion/webhook/productos_terminados")
-            return
-
-        # Si la orden ya está en progreso o completada, no marcar fallo: solo informar.
-        if orden.estado in ("consumiendo_piezas", "esperando_fabricacion", "completada"):
-            print(f"[WORKER] ℹ️ Orden #{orden_id} ya en estado '{orden.estado}'. No se modifica.")
-            return
-
-        if orden.estado == "confirmacion_fallida":
-            print(f"[WORKER] ✗ Orden #{orden_id} sin confirmación externa - FALLIDA")
-            print(f"[WORKER] No se permite fabricación local, solo externa")
-            orden.estado = "fallida"
-            if isinstance(orden.detalle, dict):
-                orden.detalle["error"] = "Servicio externo no disponible. No se permite fabricación local."
-            else:
-                orden.detalle = {"error": "Servicio externo no disponible. No se permite fabricación local."}
+            orden.detalle = detalle_orden
             session.commit()
             return
 
-        print(f"[WORKER] ⚠️ Orden #{orden_id} en estado inesperado: {orden.estado}")
-        print(f"[WORKER] Estados esperados: 'confirmado' o 'confirmacion_fallida'")
-        orden.estado = "fallida"
-        if isinstance(orden.detalle, dict):
-            orden.detalle["error"] = f"Estado inesperado: {orden.estado}. No se procesó la orden."
-        else:
-            orden.detalle = {"error": f"Estado inesperado: {orden.estado}. No se procesó la orden."}
+        # Procesar órdenes confirmadas o en reabastecimiento
+        if orden.estado not in ("confirmado", "reabasteciendo", "consumiendo_piezas"):
+            print(f"[WORKER] ℹ️ Orden #{orden_id} en estado '{orden.estado}', se espera 'confirmado/reabasteciendo'. No se consume.")
+            return
+
+        orden.estado = "consumiendo_piezas"
         session.commit()
-        print(f"[WORKER] Orden #{orden_id} marcada como fallida por estado inesperado")
+
+        plan_base = fabricacion_service.obtener_plan_base(orden.id_producto)
+        materiales_plan = [
+            {"id_pieza": item["id_pieza"], "cantidad": item["cantidad"] * orden.cantidad}
+            for item in plan_base.get("piezas", [])
+        ]
+        print(f"[WORKER DEBUG] Plan materiales (interno): {materiales_plan}")
+
+        # Pausa breve para permitir que el dashboard muestre el reabastecimiento antes del consumo
+        time.sleep(1.0)
+
+        for material in materiales_plan:
+            print(f"[WORKER DEBUG] Procesando material: {material}")
+            pieza = (
+                session.query(InventarioPieza)
+                .filter_by(id_pieza=material["id_pieza"])
+                .with_for_update()
+                .first()
+            )
+            if not pieza:
+                print(f"[WORKER DEBUG] ⚠️ Pieza {material['id_pieza']} no encontrada en DB")
+                continue
+
+            print(f"[WORKER DEBUG] Cantidad antes: {pieza.cantidad}")
+            requerido = material["cantidad"]
+
+            if pieza.cantidad < requerido and material["id_pieza"] not in piezas_solicitadas:
+                faltante = requerido - pieza.cantidad
+                print(f"[WORKER] ⚠️ Stock insuficiente de {material['id_pieza']} (faltan {faltante}), solicitando a proveedor")
+                res = proveedores_service.solicitar_piezas(material["id_pieza"], faltante)
+                detalle_orden["solicitudes_piezas"].append(
+                    {
+                        "id_pieza": material["id_pieza"],
+                        "cantidad": faltante,
+                        "tiempo_entrega": res.get("tiempo_entrega", 0) if isinstance(res, dict) else 0,
+                    }
+                )
+                piezas_solicitadas.add(material["id_pieza"])
+                session.refresh(pieza)
+                print(f"[WORKER DEBUG] Stock después de reabastecer: {pieza.cantidad}")
+
+            consumo = min(pieza.cantidad, requerido)
+            pieza.cantidad = max(pieza.cantidad - consumo, 0)
+            session.commit()
+            print(f"[WORKER] Consumido {consumo} x {material['id_pieza']}")
+            print(f"[WORKER DEBUG] Cantidad después: {pieza.cantidad}")
+            detalle_orden["consumo_piezas"].append(
+                {
+                    "id_pieza": material["id_pieza"],
+                    "consumido": consumo,
+                    "requerido": requerido,
+                    "restante": pieza.cantidad,
+                }
+            )
+
+        orden.estado = "esperando_fabricacion"
+        orden.detalle = detalle_orden
+        session.commit()
+        print(f"[WORKER] 📤 Piezas consumidas. Esperando productos de fábrica externa")
+        print(f"[WORKER] ⏳ Fábrica debe llamar POST /api/fabricacion/webhook/productos_terminados")
     except Exception as exc:  # pylint: disable=broad-except
         orden = locals().get("orden")
         if orden:

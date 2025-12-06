@@ -4,6 +4,7 @@ from app.services.fabricacion.fabricacion_service import FabricacionService
 from app.services.fabricacion.ordenes_service import OrdenesFabricacionService
 from app.services.proveedores.proveedores_service import ProveedoresService
 from app.repositories import InventarioPiezasRepository
+from app.models import InventarioPieza
 
 
 class FabricacionOrchestrator:
@@ -18,44 +19,74 @@ class FabricacionOrchestrator:
         self.log = logging.getLogger(self.__class__.__name__)
 
     def crear_orden(self, codigo: str, cantidad: int) -> dict:
-        detalle: dict[str, list | dict | str | int | bool] = {"pasos": []}
+        detalle: dict[str, list | dict | str | int | bool] = {
+            "pasos": [],
+            "solicitudes_piezas": [],
+            "consumo_piezas": [],
+            "consumido_en_orquestador": True,
+        }
         orden = self.ordenes_service.create(
             {"id_producto": codigo, "cantidad": cantidad, "estado": "calculando"}
         )
 
         try:
-            detalle["pasos"].append("Calculando piezas necesarias...")
-            plan = self.fabricacion_service.solicitar_plan(codigo, cantidad)
+            detalle["pasos"].append("Calculando piezas necesarias (plan interno)...")
+            plan_base = self.fabricacion_service.obtener_plan_base(codigo)
+            materiales = [
+                {"id_pieza": item["id_pieza"], "cantidad": item["cantidad"] * cantidad}
+                for item in plan_base.get("piezas", [])
+            ]
+            tiempo_produccion = plan_base.get("tiempo_produccion", 0) * max(cantidad // 1, 1)
             detalle["plan"] = {
-                "materiales": plan.materiales,
-                "tiempo_produccion": plan.tiempo_produccion,
+                "materiales": materiales,
+                "tiempo_produccion": tiempo_produccion,
             }
-            detalle["pasos"].append(f"Se necesitan {len(plan.materiales)} tipos de piezas")
+            detalle["pasos"].append(f"Se necesitan {len(materiales)} tipos de piezas")
 
-            detalle["pasos"].append("Verificando inventario de piezas...")
+            detalle["pasos"].append("Verificando inventario de piezas, solicitando faltantes y consumiendo...")
             tiempo_reabastecimiento = 0
 
-            for material in plan.materiales:
-                pieza = self.piezas_repo.get_by_id(material["id_pieza"])
+            for material in materiales:
+                pieza = (
+                    self.session.query(InventarioPieza)
+                    .filter_by(id_pieza=material["id_pieza"])
+                    .with_for_update()
+                    .first()
+                )
                 disponible = pieza.cantidad if pieza else 0
                 necesario = material["cantidad"]
 
                 if disponible < necesario:
                     faltante = necesario - disponible
-                    detalle["pasos"].append(f"Pieza {material['id_pieza']}: faltan {faltante} unidades")
-                    resultado_proveedor = self.proveedores_service.solicitar_piezas(
-                        material["id_pieza"], faltante
+                    detalle["pasos"].append(f"Pieza {material['id_pieza']}: faltan {faltante} unidades, solicitando y reabasteciendo...")
+                    res = self.proveedores_service.solicitar_piezas(material["id_pieza"], faltante)
+                    detalle["solicitudes_piezas"].append(
+                        {
+                            "id_pieza": material["id_pieza"],
+                            "cantidad": faltante,
+                            "tiempo_entrega": res.get("tiempo_entrega", 0) if isinstance(res, dict) else 0,
+                        }
                     )
                     tiempo_reabastecimiento = max(
-                        tiempo_reabastecimiento, resultado_proveedor["tiempo_entrega"]
+                        tiempo_reabastecimiento,
+                        (res or {}).get("tiempo_entrega", pieza.proveedor.tiempo if pieza and pieza.proveedor else 0),
                     )
-                    detalle["pasos"].append(
-                        f"Solicitado a proveedor: {faltante} x {material['id_pieza']}"
-                    )
+                    self.session.refresh(pieza)
 
-            self.session.commit()
+                consumo = min(pieza.cantidad if pieza else 0, necesario)
+                if pieza:
+                    pieza.cantidad = max(pieza.cantidad - consumo, 0)
+                detalle["consumo_piezas"].append(
+                    {
+                        "id_pieza": material["id_pieza"],
+                        "consumido": consumo,
+                        "requerido": necesario,
+                        "restante": pieza.cantidad if pieza else 0,
+                    }
+                )
+                self.session.commit()
 
-            detalle["pasos"].append("Enviando confirmación a fábrica externa...")
+            detalle["pasos"].append("Enviando confirmación a fábrica externa (tras consumir piezas)...")
             orden.estado = "confirmando"
             self.session.commit()
 
@@ -64,25 +95,19 @@ class FabricacionOrchestrator:
             )
 
             if confirmacion and confirmacion.get("status") == "ok":
-                orden.estado = "confirmado"
+                orden.estado = "esperando_fabricacion"
                 detalle["pasos"].append("✓ Fábrica externa confirmó la orden")
                 detalle["confirmacion_fabrica"] = confirmacion
                 detalle["fabricacion_externa"] = True
                 self.log.info("Orden %s confirmada en fábrica externa", orden.id)
-
-                from app.tasks import queue, procesar_orden_fabricacion  # import tardío para evitar ciclos
-                queue.enqueue(procesar_orden_fabricacion, orden.id)
-                detalle["pasos"].append("Worker encolado para consumir piezas y esperar productos")
             else:
                 orden.estado = "confirmacion_fallida"
                 detalle["pasos"].append("✗ Fábrica externa no disponible")
                 detalle["pasos"].append("No se permite fabricación local - orden marcada como fallida")
                 detalle["fabricacion_externa"] = False
                 self.log.warning("Orden %s sin confirmación externa, marcada como fallida", orden.id)
-                from app.tasks import queue, procesar_orden_fabricacion  # import tardío para evitar ciclos
-                queue.enqueue(procesar_orden_fabricacion, orden.id)
 
-            orden.tiempo_estimado = tiempo_reabastecimiento + plan.tiempo_produccion
+            orden.tiempo_estimado = tiempo_reabastecimiento + tiempo_produccion
             orden.detalle = detalle
             self.session.commit()
 
