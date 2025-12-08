@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.services.fabricacion.fabricacion_service import FabricacionService
 from app.services.fabricacion.ordenes_service import OrdenesFabricacionService
 from app.services.proveedores.proveedores_service import ProveedoresService
+from app.services.proveedores.solicitudes_service import SolicitudesPiezaService
 from app.repositories import InventarioPiezasRepository
 from app.models import InventarioPieza
 
@@ -16,6 +17,7 @@ class FabricacionOrchestrator:
         self.ordenes_service = OrdenesFabricacionService(session)
         self.piezas_repo = InventarioPiezasRepository(session)
         self.proveedores_service = ProveedoresService(session, piezas_repository=self.piezas_repo)
+        self.solicitudes_service = SolicitudesPiezaService(session)
         self.log = logging.getLogger(self.__class__.__name__)
 
     def crear_orden(self, codigo: str, cantidad: int) -> dict:
@@ -59,19 +61,41 @@ class FabricacionOrchestrator:
                 if disponible < necesario:
                     faltante = necesario - disponible
                     detalle["pasos"].append(f"Pieza {material['id_pieza']}: faltan {faltante} unidades, solicitando y reabasteciendo...")
-                    res = self.proveedores_service.solicitar_piezas(material["id_pieza"], faltante)
-                    detalle["solicitudes_piezas"].append(
+                    proveedor = pieza.proveedor if pieza else None
+                    eta = proveedor.tiempo if proveedor else 0
+
+                    # Registrar solicitud async para que aparezca en dashboard
+                    solicitud = self.solicitudes_service.create(
                         {
                             "id_pieza": material["id_pieza"],
                             "cantidad": faltante,
-                            "tiempo_entrega": res.get("tiempo_entrega", 0) if isinstance(res, dict) else 0,
+                            "estado": "en_proceso",
+                            "tiempo_estimado": eta,
                         }
                     )
+
+                    res = self.proveedores_service.solicitar_piezas(material["id_pieza"], faltante)
                     tiempo_reabastecimiento = max(
                         tiempo_reabastecimiento,
-                        (res or {}).get("tiempo_entrega", pieza.proveedor.tiempo if pieza and pieza.proveedor else 0),
+                        (res or {}).get("tiempo_entrega", eta),
                     )
                     self.session.refresh(pieza)
+
+                    # Marcar solicitud como completada tras el reabastecimiento simulado
+                    self.solicitudes_service.update(
+                        solicitud.id,
+                        {"estado": "completada", "tiempo_estimado": tiempo_reabastecimiento},
+                    )
+
+                    detalle["solicitudes_piezas"].append(
+                        {
+                            "id": solicitud.id,
+                            "id_pieza": material["id_pieza"],
+                            "cantidad": faltante,
+                            "tiempo_entrega": tiempo_reabastecimiento,
+                            "estado": "completada",
+                        }
+                    )
 
                 consumo = min(pieza.cantidad if pieza else 0, necesario)
                 if pieza:

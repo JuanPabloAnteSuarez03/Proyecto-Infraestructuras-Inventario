@@ -5,13 +5,14 @@ Ejecutar: python test_fabrica.py
 """
 import httpx
 import json
+import os
 from datetime import datetime
 
 # URL de la fábrica
-FABRICA_URL = "http://ec2-98-93-67-35.compute-1.amazonaws.com:8555"
+FABRICA_URL = os.getenv("FABRICA_URL", "http://localhost:8555")
 
 # URL de tu API local
-LOCAL_URL = "http://localhost:5050"
+LOCAL_URL = os.getenv("LOCAL_URL", "http://localhost:5050")
 
 
 def print_header(text):

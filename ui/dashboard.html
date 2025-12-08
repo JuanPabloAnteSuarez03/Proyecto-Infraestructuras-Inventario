@@ -27,6 +27,10 @@
     button:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(34, 211, 238, 0.2); }
     button:disabled { background: #4b5563; color: #cbd5e1; cursor: not-allowed; }
     input { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 9px 12px; }
+    .input-error { border-color: #ef4444 !important; box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2); }
+    .input-valid { border-color: #10b981 !important; box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.2); }
+    .validation-hint { font-size: 11px; color: #ef4444; margin-top: 4px; display: none; }
+    .validation-hint.show { display: block; }
     pre { background: #0c1425; color: #93c5fd; padding: 10px; border-radius: 10px; max-height: 260px; overflow: auto; font-size: 13px; border: 1px solid var(--border); box-shadow: var(--shadow); }
     .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
     .badge { padding: 4px 8px; border-radius: 999px; background: #122038; color: var(--muted); font-size: 12px; border: 1px solid var(--border); }
@@ -120,7 +124,12 @@
       </div>
       <div class="section-title">Base URL de Fábrica</div>
       <div class="row" style="gap:8px; flex-wrap: wrap;">
-        <input id="ext-url-input" type="text" placeholder="http://fabricacion_api:8000" style="min-width: 240px;">
+        <div style="flex: 1; min-width: 240px;">
+          <input id="ext-url-input" type="text" placeholder="http://fabricacion_api:8000"
+                 style="width: 100%;"
+                 oninput="validateURLInput(this)">
+          <div id="url-validation-hint" class="validation-hint"></div>
+        </div>
         <button onclick="actualizarFabrica()" style="background:#22c55e;">Guardar</button>
         <button onclick="verificarServicioExterno()" style="background:#3b82f6;">Probar</button>
       </div>
@@ -260,19 +269,172 @@
       verificarServicioExterno();
     }
 
-    async function actualizarFabrica() {
-      const base = document.getElementById("ext-url-input").value.trim();
+    /**
+     * Validate fabrication service URL on client side.
+     * @param {string} url - URL to validate
+     * @returns {{valid: boolean, error?: string, normalized?: string}}
+     */
+    function validateFabricacionURL(url) {
+      // Allow empty (clears configuration)
+      if (!url || !url.trim()) {
+        return { valid: true, normalized: "" };
+      }
+
+      url = url.trim();
+
+      // Check for common malformed patterns
+      const malformedPatterns = [
+        { regex: /:\/\/\s+/, message: "Espacio después de '://' no permitido" },
+        { regex: /\s+:/, message: "Espacio antes del puerto no permitido" },
+        { regex: /\/localhost:\d+/, message: "Puerto debe estar en hostname (http://localhost:8555)" },
+        { regex: /\/127\.0\.0\.1:\d+/, message: "Puerto debe estar en hostname, no en ruta" },
+        { regex: /\/host\.docker\.internal:\d+/, message: "Puerto en hostname, no en ruta" },
+      ];
+
+      for (const { regex, message } of malformedPatterns) {
+        if (regex.test(url)) {
+          return { valid: false, error: message };
+        }
+      }
+
+      // Check for missing scheme
+      if (!url.match(/^https?:\/\//)) {
+        return {
+          valid: false,
+          error: "URL debe comenzar con http:// o https://"
+        };
+      }
+
+      // Parse URL
+      let parsed;
       try {
-        log(`📝 Actualizando fábrica externa a ${base || '(vacío)'}`, "send");
-        await getJson(`${host}/api/fabricacion/external/config`, {
+        parsed = new URL(url);
+      } catch (e) {
+        return {
+          valid: false,
+          error: `URL inválida: ${e.message}`
+        };
+      }
+
+      // Validate scheme
+      if (!['http:', 'https:'].includes(parsed.protocol)) {
+        return {
+          valid: false,
+          error: `Protocolo inválido: ${parsed.protocol}`
+        };
+      }
+
+      // Validate hostname exists
+      if (!parsed.hostname) {
+        return {
+          valid: false,
+          error: "Falta el hostname (ej: host.docker.internal)"
+        };
+      }
+
+      // Check for spaces in hostname/port
+      if (parsed.host.includes(' ')) {
+        return {
+          valid: false,
+          error: "Espacios no permitidos en hostname o puerto"
+        };
+      }
+
+      // Check path doesn't contain port-like patterns
+      if (parsed.pathname.match(/\/[^\/]+:\d+/)) {
+        return {
+          valid: false,
+          error: "Puerto debe estar en el hostname (http://host:8555), no en la ruta"
+        };
+      }
+
+      // Normalize: remove trailing slash
+      const normalized = `${parsed.protocol}//${parsed.host}${parsed.pathname}`.replace(/\/$/, '');
+
+      return { valid: true, normalized };
+    }
+
+    function validateURLInput(input) {
+      const hint = document.getElementById("url-validation-hint");
+      const url = input.value.trim();
+
+      // Don't validate if empty (allows clearing)
+      if (!url) {
+        input.classList.remove("input-error", "input-valid");
+        if (hint) hint.classList.remove("show");
+        return;
+      }
+
+      const validation = validateFabricacionURL(url);
+
+      if (validation.valid) {
+        input.classList.remove("input-error");
+        input.classList.add("input-valid");
+        if (hint) hint.classList.remove("show");
+      } else {
+        input.classList.remove("input-valid");
+        input.classList.add("input-error");
+        if (hint) {
+          hint.textContent = validation.error;
+          hint.classList.add("show");
+        }
+      }
+    }
+
+    async function actualizarFabrica() {
+      const input = document.getElementById("ext-url-input");
+      const rawUrl = input.value.trim();
+
+      // Client-side validation
+      const validation = validateFabricacionURL(rawUrl);
+
+      if (!validation.valid) {
+        log(`❌ URL inválida: ${validation.error}`, "inv");
+        alert(`⚠️ URL inválida\n\n${validation.error}\n\nEjemplos válidos:\n• http://host.docker.internal:8555\n• http://localhost:8555\n• http://fabricacion_api:8000`);
+        input.focus();
+        return;
+      }
+
+      const normalizedUrl = validation.normalized;
+
+      try {
+        log(`📝 Actualizando fábrica externa a ${normalizedUrl || '(vacío)'}`, "send");
+        const response = await getJson(`${host}/api/fabricacion/external/config`, {
           method: "POST",
           headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({base_url: base}),
+          body: JSON.stringify({base_url: normalizedUrl}),
         });
-        log("✅ Base de fábrica actualizada", "inv");
+
+        log("✅ Base de fábrica actualizada correctamente", "inv");
+
+        // Update input with normalized URL
+        input.value = normalizedUrl;
+
+        // Verify connection
         verificarServicioExterno();
+
       } catch (err) {
-        log(`❌ Error actualizando fábrica: ${err.message}`, "inv");
+        // Handle backend validation errors
+        let errorMsg = err.message;
+
+        // Try to parse detailed error response
+        try {
+          if (err.response) {
+            const errorData = await err.response.json();
+            if (errorData.detail) {
+              if (typeof errorData.detail === 'object') {
+                errorMsg = errorData.detail.message || errorData.detail.error || JSON.stringify(errorData.detail);
+              } else {
+                errorMsg = errorData.detail;
+              }
+            }
+          }
+        } catch (parseErr) {
+          // Couldn't parse, use original message
+        }
+
+        log(`❌ Error actualizando fábrica: ${errorMsg}`, "inv");
+        alert(`❌ Error al actualizar URL de fábrica:\n\n${errorMsg}`);
       }
     }
 

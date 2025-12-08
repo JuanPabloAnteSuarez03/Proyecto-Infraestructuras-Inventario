@@ -1,0 +1,30 @@
+[
+  {
+    "id": "prod-s1",
+    "sku": "PROD-S1-001",
+    "internalId": "S1",
+    "name": "Producto Premium S1",
+    "description": "Producto de alta calidad fabricado con componentes P1, P2 y P3. Ideal para uso industrial y comercial.",
+    "price": 1299990,
+    "category": "Productos Manufacturados",
+    "brand": "Fabricación Interna",
+    "imageUrl": "https://via.placeholder.com/400x300?text=Producto+S1",
+    "active": true,
+    "availabilityType": "MANUFACTURING",
+    "estimatedDays": 2
+  },
+  {
+    "id": "prod-s2",
+    "sku": "PROD-S2-001",
+    "internalId": "S2",
+    "name": "Producto Estándar S2",
+    "description": "Producto versátil fabricado con componentes P4, P5 y P6. Excelente relación calidad-precio para aplicaciones generales.",
+    "price": 899990,
+    "category": "Productos Manufacturados",
+    "brand": "Fabricación Interna",
+    "imageUrl": "https://via.placeholder.com/400x300?text=Producto+S2",
+    "active": true,
+    "availabilityType": "MANUFACTURING",
+    "estimatedDays": 3
+  }
+]

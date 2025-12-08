@@ -28,9 +28,11 @@ services:
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: fabricacion_db
-      API_PATH_INVENTARIO: http://100.110.27.44:5000/api/productos/ingresos
+      API_PATH_INVENTARIO: http://host.docker.internal:5050/api/productos/ingresos
     ports:
       - "8555:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - fabricacion_net
 

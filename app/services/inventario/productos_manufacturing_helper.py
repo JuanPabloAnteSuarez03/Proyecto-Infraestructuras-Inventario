@@ -13,6 +13,7 @@ from app.models import Proveedor
 from app.domain import normalize_producto_codigo
 from app.services.fabricacion.fabricacion_service import FabricacionService
 from app.services.proveedores.proveedores_service import ProveedoresService
+from app.services.proveedores.solicitudes_service import SolicitudesPiezaService
 
 
 class ProductosManufacturingHelper:
@@ -47,6 +48,7 @@ class ProductosManufacturingHelper:
         self.proveedores_service = proveedores_service or ProveedoresService(
             session, piezas_repository=piezas_repository
         )
+        self.solicitudes_service = SolicitudesPiezaService(session)
 
     def producir_lote(
         self,
@@ -154,11 +156,25 @@ class ProductosManufacturingHelper:
 
             if disponible < material["cantidad"]:
                 faltante = material["cantidad"] - disponible
+                eta = pieza.proveedor.tiempo if pieza and pieza.proveedor else 0
+                solicitud = self.solicitudes_service.create(
+                    {
+                        "id_pieza": material["id_pieza"],
+                        "cantidad": faltante,
+                        "estado": "en_proceso",
+                        "tiempo_estimado": eta,
+                    }
+                )
                 resultado = self.proveedores_service.solicitar_piezas(
                     material["id_pieza"], faltante
                 )
+                tiempo_entrega = resultado.get("tiempo_entrega", eta)
                 tiempo_reabastecimiento = max(
-                    tiempo_reabastecimiento, resultado["tiempo_entrega"]
+                    tiempo_reabastecimiento, tiempo_entrega
+                )
+                self.solicitudes_service.update(
+                    solicitud.id,
+                    {"estado": "completada", "tiempo_estimado": tiempo_entrega},
                 )
 
         return tiempo_reabastecimiento

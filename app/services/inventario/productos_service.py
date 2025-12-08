@@ -375,21 +375,6 @@ class InventarioProductosService:
             "fabricado": fabricado,
         }
 
-        # Evaluar reposición automática
-        auto_info = self._evaluar_stock_minimo(codigo)
-        respuesta["tiempo_estimado"] = max(
-            respuesta["tiempo_estimado"], auto_info["tiempo_estimado"]
-        )
-
-        if auto_info.get("accion") == "fabricar":
-            self.log.info(
-                "[AUTO_STOCK] Stock bajo en %s: disponible=%s, se fabricará lote de reposición (tiempo=%s min)",
-                codigo,
-                disponible_actual.cantidad if disponible_actual else 0,
-                auto_info["tiempo_estimado"],
-            )
-            self._encolar_reposicion(codigo, auto_info.get("cantidad_reponer", 0))
-
         if respuesta["cantidad_pendiente"] == 0:
             respuesta["tiempo_estimado"] = 0
 
@@ -455,21 +440,6 @@ class InventarioProductosService:
             "despachado": True,
             "estado_ingreso": estado_ingreso,
         }
-
-        # Evaluar reposición automática
-        auto_info = self._evaluar_stock_minimo(codigo)
-        respuesta["tiempo_estimado"] = max(
-            respuesta["tiempo_estimado"], auto_info["tiempo_estimado"]
-        )
-
-        if auto_info.get("accion") == "fabricar":
-            self.log.info(
-                "[AUTO_STOCK] Stock bajo en %s durante despacho: disponible=%s, se fabricará lote de reposición (tiempo=%s min)",
-                codigo,
-                respuesta["cantidad_disponible"],
-                auto_info["tiempo_estimado"],
-            )
-            self._encolar_reposicion(codigo, auto_info.get("cantidad_reponer", 0))
 
         if respuesta["cantidad_pendiente"] == 0:
             respuesta["tiempo_estimado"] = 0

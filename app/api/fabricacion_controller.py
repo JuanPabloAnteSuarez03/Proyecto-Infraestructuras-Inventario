@@ -15,6 +15,7 @@ from ..models.entities import OrdenFabricacion
 from ..repositories import InventarioPiezasRepository
 from ..schemas.api_models import SolicitudFabricacion, CalculoPiezas, OrdenFabricacionAsync
 from ..database import get_db
+from ..utils.url_validator import URLValidationError
 
 router = APIRouter(prefix="/api/fabricacion", tags=["fabricacion"])
 fabricacion_service = FabricacionService()
@@ -156,30 +157,42 @@ def resetear_ordenes(session: Session = Depends(get_db)):
 @router.get("/external/status")
 def verificar_servicio_externo():
     """Proxy endpoint para verificar el estado del servicio externo de fabricación"""
-    base_url = FabricacionService.get_base_url()
-    if not base_url:
-        return {"conectado": False, "planos": {}}
+    base_urls = FabricacionService.candidate_base_urls()
+    if not base_urls:
+        return {"conectado": False, "base_url": None, "planos": {}}
 
-    planos = {}
-    for plano_id, codigo in [(1, "S1"), (2, "S2")]:
-        try:
-            resp = httpx.get(f"{base_url}/fabricacion/planos/{plano_id}", timeout=5)
-            if resp.status_code == 200:
-                data = resp.json()
-                planos[codigo] = {
-                    "disponible": True,
-                    "tiempo_fabricacion": data.get("tiempo_fabricacion"),
-                    "nombre": data.get("nombre"),
-                }
-            else:
+    last_planos: dict = {}
+    for base_url in base_urls:
+        planos = {}
+        for plano_id, codigo in [(1, "S1"), (2, "S2")]:
+            try:
+                resp = httpx.get(f"{base_url}/fabricacion/planos/{plano_id}", timeout=5)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    planos[codigo] = {
+                        "disponible": True,
+                        "tiempo_fabricacion": data.get("tiempo_fabricacion"),
+                        "nombre": data.get("nombre"),
+                    }
+                else:
+                    planos[codigo] = {"disponible": False}
+            except Exception:
                 planos[codigo] = {"disponible": False}
-        except Exception:
-            planos[codigo] = {"disponible": False}
+
+        last_planos = planos
+        if any(p.get("disponible") for p in planos.values()):
+            # Persistir la URL que sí respondió para que toda la app use la misma
+            FabricacionService.set_base_url(base_url)
+            return {
+                "conectado": True,
+                "base_url": base_url,
+                "planos": planos,
+            }
 
     return {
-        "conectado": any(p.get("disponible") for p in planos.values()),
-        "base_url": base_url,
-        "planos": planos,
+        "conectado": False,
+        "base_url": base_urls[0],
+        "planos": last_planos,
     }
 
 
@@ -192,16 +205,52 @@ def obtener_config_externa():
 
 @router.post("/external/config")
 def actualizar_config_externa(payload: dict):
-    """Actualizar base_url de fábrica externa en caliente."""
+    """
+    Actualizar base_url de fábrica externa en caliente.
+
+    Request body:
+        {"base_url": "http://host.docker.internal:8555"}
+
+    Returns:
+        {"message": "...", "base_url": "..."}
+
+    Raises:
+        HTTPException 400: Si la URL es malformada o inválida
+    """
     nueva_url = (payload or {}).get("base_url", "")
-    FabricacionService.set_base_url(nueva_url)
-    return {"message": "Base URL de fábrica actualizada", "base_url": FabricacionService.get_base_url()}
+
+    try:
+        # Validation happens inside set_base_url
+        FabricacionService.set_base_url(nueva_url)
+
+        return {
+            "message": "Base URL de fábrica actualizada correctamente",
+            "base_url": FabricacionService.get_base_url() or None
+        }
+    except URLValidationError as e:
+        # Return detailed validation error to client
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "URL de fabricación inválida",
+                "message": e.message,
+                "url_provided": e.url,
+                "details": e.details,
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error al actualizar URL de fabricación: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error interno al actualizar URL: {str(e)}"
+        )
 
 
 @router.get("/external/planos/{plano_id}")
 def obtener_plano_externo(plano_id: int):
     """Proxy endpoint para obtener información de un plano del servicio externo"""
-    base_url = os.getenv("FABRICA_BASE_URL", "").rstrip("/")
+    bases = FabricacionService.candidate_base_urls()
+    base_url = bases[0] if bases else ""
     if not base_url:
         raise HTTPException(status_code=503, detail="Servicio externo no configurado")
 

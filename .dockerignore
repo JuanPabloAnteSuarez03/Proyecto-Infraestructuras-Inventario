@@ -1,0 +1,12 @@
+.venv
+__pycache__
+.git
+.gitignore
+*.pyc
+*.pyo
+*.swp
+*.swo
+*.log
+node_modules
+/external/fabricacion-api-main/__pycache__
+/external/fabricacion-api-main/.venv
