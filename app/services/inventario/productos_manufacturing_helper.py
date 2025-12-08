@@ -7,6 +7,8 @@ fabricación y proveedores para garantizar niveles de stock adecuados.
 
 from __future__ import annotations
 from typing import Any
+import os
+import time
 from sqlalchemy.orm import Session
 from app.repositories import InventarioPiezasRepository
 from app.models import Proveedor
@@ -49,6 +51,11 @@ class ProductosManufacturingHelper:
             session, piezas_repository=piezas_repository
         )
         self.solicitudes_service = SolicitudesPiezaService(session)
+        try:
+            delay = float(os.getenv("VISUAL_CONSUMO_DELAY", "5"))
+        except ValueError:
+            delay = 5.0
+        self.consumo_delay = max(0.0, min(delay, 10.0))  # evitar bloqueos largos
 
     def producir_lote(
         self,
@@ -177,6 +184,9 @@ class ProductosManufacturingHelper:
                     {"estado": "completada", "tiempo_estimado": tiempo_entrega},
                 )
 
+        # Pausa breve para permitir que el dashboard muestre las piezas recibidas
+        if self.consumo_delay > 0:
+            time.sleep(self.consumo_delay)
         return tiempo_reabastecimiento
 
     @staticmethod

@@ -1,4 +1,6 @@
 import logging
+import os
+import time
 from sqlalchemy.orm import Session
 from app.services.fabricacion.fabricacion_service import FabricacionService
 from app.services.fabricacion.ordenes_service import OrdenesFabricacionService
@@ -19,6 +21,11 @@ class FabricacionOrchestrator:
         self.proveedores_service = ProveedoresService(session, piezas_repository=self.piezas_repo)
         self.solicitudes_service = SolicitudesPiezaService(session)
         self.log = logging.getLogger(self.__class__.__name__)
+        try:
+            delay = float(os.getenv("VISUAL_CONSUMO_DELAY", "5"))
+        except ValueError:
+            delay = 5.0
+        self.consumo_delay = max(0.0, min(delay, 10.0))
 
     def crear_orden(self, codigo: str, cantidad: int) -> dict:
         detalle: dict[str, list | dict | str | int | bool] = {
@@ -96,6 +103,8 @@ class FabricacionOrchestrator:
                             "estado": "completada",
                         }
                     )
+                    if self.consumo_delay > 0:
+                        time.sleep(self.consumo_delay)
 
                 consumo = min(pieza.cantidad if pieza else 0, necesario)
                 if pieza:
