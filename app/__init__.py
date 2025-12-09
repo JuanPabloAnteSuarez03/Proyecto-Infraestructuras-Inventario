@@ -28,7 +28,7 @@ def create_app(config_name: str | None = None) -> FastAPI:
 
     setup_logging()
 
-    async def _auto_restock_loop(interval: int = 30, piezas_interval: int = 30) -> None:
+    async def _auto_restock_loop(interval: int = 0, piezas_interval: int = 30) -> None:
         """
         Loop sencillo que revisa stock disponible y encola órdenes de reposición
         cuando se cae bajo el mínimo, sin depender de reservas/ despachos.
@@ -38,7 +38,8 @@ def create_app(config_name: str | None = None) -> FastAPI:
             await asyncio.sleep(interval)
             try:
                 with SessionLocal() as session:
-                    _verificar_productos(session, log)
+                    if interval > 0:
+                        _verificar_productos(session, log)
                     _verificar_piezas(session, log)
             except Exception as exc:  # pylint: disable=broad-except
                 log.warning("[AUTO_STOCK] Error en loop de reposición: %s", exc)
@@ -53,9 +54,23 @@ def create_app(config_name: str | None = None) -> FastAPI:
         )
         return any(activos)
 
+    def _hay_ordenes_abiertas(ordenes_service: OrdenesFabricacionService) -> bool:
+        """True si existe alguna orden no finalizada (para pausar auto-restock de productos)."""
+        abiertos = (
+            o for o in ordenes_service.list()
+            if o.estado not in ("completada", "fallida", "confirmacion_fallida")
+        )
+        return any(abiertos)
+
     def _verificar_productos(session, log) -> None:
         productos_service = InventarioProductosService(session)
         ordenes_service = OrdenesFabricacionService(session)
+
+        # Pausar si hay órdenes abiertas para no solapar con pedidos en curso
+        if _hay_ordenes_abiertas(ordenes_service):
+            log.debug("[AUTO_STOCK] Se omite reposición de productos: hay órdenes abiertas.")
+            return
+
         codigos = {p.id_producto for p in productos_service.list()}
         for codigo in codigos:
             info = productos_service._evaluar_stock_minimo(codigo)
@@ -127,8 +142,9 @@ def create_app(config_name: str | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
         Base.metadata.create_all(bind=engine)
-        interval = int(os.getenv("AUTO_RESTOCK_INTERVAL", "30"))
-        piezas_interval = int(os.getenv("AUTO_PIEZAS_INTERVAL", str(interval)))
+        interval = int(os.getenv("AUTO_RESTOCK_INTERVAL", "0"))
+        piezas_default = 30
+        piezas_interval = int(os.getenv("AUTO_PIEZAS_INTERVAL", str(piezas_default)))
         restock_task = asyncio.create_task(_auto_restock_loop(interval, piezas_interval))
         try:
             yield

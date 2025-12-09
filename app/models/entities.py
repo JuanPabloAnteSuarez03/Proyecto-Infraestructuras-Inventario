@@ -75,3 +75,19 @@ class OrdenFabricacion(TimestampMixin, Base):
     estado: Mapped[str] = mapped_column(String(32), nullable=False, default="pendiente")
     tiempo_estimado: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     detalle: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+
+class PedidoVenta(TimestampMixin, Base):
+    __tablename__ = "pedidos_venta"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tipo: Mapped[str] = mapped_column(String(16), nullable=False)  # online / local
+    id_producto: Mapped[str] = mapped_column(String(16), nullable=False)
+    cantidad_solicitada: Mapped[int] = mapped_column(Integer, nullable=False)
+    # Usamos el nombre de columna anterior para compatibilidad sin migrar la DB
+    cantidad_atendida: Mapped[int] = mapped_column(
+        "cantidad_inmediata", Integer, nullable=False, default=0
+    )
+    cantidad_faltante: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    estado_destino: Mapped[str] = mapped_column(String(32), nullable=False)  # Pendiente / Reservado
+    estado: Mapped[str] = mapped_column(String(32), nullable=False, default="abierto")  # abierto / completado

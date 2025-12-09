@@ -5,6 +5,7 @@ from .entities import (
     Movimiento,
     SolicitudPieza,
     OrdenFabricacion,
+    PedidoVenta,
 )
 
 __all__ = [
@@ -14,4 +15,5 @@ __all__ = [
     "Movimiento",
     "SolicitudPieza",
     "OrdenFabricacion",
+    "PedidoVenta",
 ]

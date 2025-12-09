@@ -58,6 +58,20 @@ class Despacho(BaseModel):
     id_producto: str
     cantidad: int
 
+class PedidoOnline(BaseModel):
+    id_producto: str
+    cantidad: int
+
+
+class PedidoLocal(BaseModel):
+    id_producto: str
+    cantidad: int
+
+
+class RetiroLocal(BaseModel):
+    id_producto: str
+    cantidad: int
+
 
 class PiezaCreate(BaseModel):
     id_pieza: str

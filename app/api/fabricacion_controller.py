@@ -305,8 +305,18 @@ async def recibir_productos_fabricados(
 
     try:
         productos_service = InventarioProductosService(session)
-        producto = productos_service.incrementar(
-            producto_id=codigo, cantidad=cantidad, estado=estado
+
+        # Priorizar entregar a Pendiente/Reservado solo si hay pedidos abiertos en esos destinos
+        prefer = "Disponible"
+        if productos_service.hay_pedido_abierto(codigo, "Pendiente"):
+            prefer = "Pendiente"
+        elif productos_service.hay_pedido_abierto(codigo, "Reservado"):
+            prefer = "Reservado"
+
+        resultado = productos_service.ingresar_entrega_prioritaria(
+            producto_id=codigo,
+            cantidad=cantidad,
+            destino_preferido=prefer,
         )
 
         entregas = EntregasFabricacionService(session).registrar_entrega(
@@ -318,7 +328,9 @@ async def recibir_productos_fabricados(
         return {
             "status": "ok",
             "mensaje": f"Recibidos {cantidad} productos {codigo}",
-            "inventario_actual": producto.cantidad,
+            "destino": prefer,
+            "asignado_destino": resultado.get("asignado_destino"),
+            "remanente_disponible": resultado.get("remanente_disponible"),
             "entrega": {
                 "orden_id": entregas["orden"].id if entregas else None,
                 "acumulado": entregas["acumulado"] if entregas else cantidad,

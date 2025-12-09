@@ -4,6 +4,7 @@ from .proveedores_repository import ProveedoresRepository
 from .movimientos_repository import MovimientosRepository
 from .solicitudes_repository import SolicitudPiezaRepository
 from .ordenes_repository import OrdenFabricacionRepository
+from .pedidos_venta_repository import PedidoVentaRepository
 
 __all__ = [
     "InventarioProductosRepository",
@@ -12,4 +13,5 @@ __all__ = [
     "MovimientosRepository",
     "SolicitudPiezaRepository",
     "OrdenFabricacionRepository",
+    "PedidoVentaRepository",
 ]

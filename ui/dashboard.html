@@ -63,6 +63,9 @@
     .section-title { font-size: 14px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); margin: 0 0 8px 0; }
     .action-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; width: 100%; }
     .action-grid button { width: 100%; justify-content: center; }
+    .table-card { display: flex; flex-direction: column; gap: 8px; }
+    .table-scroll { margin-top: 4px; border: 1px solid var(--border); border-radius: 10px; background: rgba(255,255,255,0.02); overflow: auto; max-height: 320px; }
+    .table-scroll table { margin: 0; }
   </style>
 </head>
 <body>
@@ -165,6 +168,44 @@
       </div>
     </div>
 
+    <div class="card">
+      <h3>Pedidos Online / Local</h3>
+      <div style="display: grid; gap: 12px;">
+        <div>
+          <div class="row" style="margin-bottom: 8px;">
+            <strong>Online S1</strong>
+            <input type="number" id="qty-online-s1" value="500" min="1" step="50" style="width: 120px; padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
+            <button onclick="pedidoOnline('S1')" style="background:#0ea5e9;">Crear</button>
+          </div>
+        </div>
+        <div>
+          <div class="row" style="margin-bottom: 8px;">
+            <strong>Online S2</strong>
+            <input type="number" id="qty-online-s2" value="500" min="1" step="50" style="width: 120px; padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
+            <button onclick="pedidoOnline('S2')" style="background:#0ea5e9;">Crear</button>
+          </div>
+        </div>
+        <div style="border-top: 1px solid var(--border); padding-top: 12px;">
+          <div class="row" style="margin-bottom: 8px;">
+            <strong>Local S1</strong>
+            <input type="number" id="qty-local-s1" value="300" min="1" step="50" style="width: 120px; padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
+            <button onclick="pedidoLocal('S1')" style="background:#22c55e;">Reservar/Fabricar</button>
+            <input type="number" id="qty-retiro-s1" value="100" min="1" step="10" style="width: 100px; padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
+            <button onclick="confirmarRetiro('S1')" style="background:#f97316;">Retiro</button>
+          </div>
+        </div>
+        <div>
+          <div class="row" style="margin-bottom: 8px;">
+            <strong>Local S2</strong>
+            <input type="number" id="qty-local-s2" value="300" min="1" step="50" style="width: 120px; padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
+            <button onclick="pedidoLocal('S2')" style="background:#22c55e;">Reservar/Fabricar</button>
+            <input type="number" id="qty-retiro-s2" value="100" min="1" step="10" style="width: 100px; padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
+            <button onclick="confirmarRetiro('S2')" style="background:#f97316;">Retiro</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="card" style="display: flex; flex-direction: column; gap: 8px;">
       <h3>Logs de Integración</h3>
       <div class="action-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
@@ -203,13 +244,23 @@
       <h3>Piezas</h3>
       <table id="tbl-piezas"></table>
     </div>
-    <div class="card">
+    <div class="card table-card">
       <h3>Solicitudes de piezas (async)</h3>
-      <table id="tbl-solicitudes"></table>
+      <div class="table-scroll">
+        <table id="tbl-solicitudes"></table>
+      </div>
     </div>
-    <div class="card">
+    <div class="card table-card">
+      <h3>Pedidos de Venta</h3>
+      <div class="table-scroll">
+        <table id="tbl-pedidos"></table>
+      </div>
+    </div>
+    <div class="card table-card">
       <h3>Órdenes de Fabricación</h3>
-      <table id="tbl-ordenes"></table>
+      <div class="table-scroll">
+        <table id="tbl-ordenes"></table>
+      </div>
     </div>
   </div>
 
@@ -528,11 +579,12 @@
 
     async function refresh() {
       try {
-        const [prod, piezas, sol, ord] = await Promise.all([
+        const [prod, piezas, sol, ord, pedidos] = await Promise.all([
           getJson(`${host}/api/productos`),
           getJson(`${host}/api/piezas`),
           getJson(`${host}/api/proveedores/solicitudes_async`),
           getJson(`${host}/api/fabricacion/ordenes`),
+          getJson(`${host}/api/productos/pedidos`),
         ]);
 
         // Solicitudes pedidas por el orquestador (en detalle de cada orden)
@@ -583,6 +635,7 @@
         renderPiezas(piezas);
         renderSolicitudes(solicitudesCombinadas);
         renderOrdenes(ord);
+        renderPedidos(pedidos);
       } catch (err) {
         log(`Error refrescando: ${err.message}`);
       }
@@ -605,6 +658,26 @@
           const eta = s.tiempo_entrega ? `${s.tiempo_entrega}` : "-";
           return `<tr><td>${s.id}</td><td>${s.orden}</td><td>${s.id_pieza}</td><td>${s.cantidad}</td><td>${s.estado || '-'}</td><td>${eta}</td></tr>`;
         }).join("");
+    }
+    function renderPedidos(items) {
+      const t = document.getElementById("tbl-pedidos");
+        const header = "<tr><th>ID</th><th>Tipo</th><th>Prod</th><th>Solic.</th><th>Atendido</th><th>Faltante</th><th>Destino</th><th>Estado</th><th>Hora</th></tr>";
+        const rows = items.map(p => {
+          const hora = p.created_at ? new Date(p.created_at).toLocaleTimeString() : "-";
+          const faltante = p.cantidad_faltante < 0 ? 0 : p.cantidad_faltante;
+          return `<tr>
+          <td>${p.id}</td>
+          <td>${p.tipo}</td>
+          <td>${p.id_producto}</td>
+          <td>${p.cantidad_solicitada}</td>
+          <td>${p.cantidad_atendida}</td>
+          <td>${faltante}</td>
+          <td>${p.estado_destino}</td>
+          <td>${p.estado}</td>
+          <td>${hora}</td>
+        </tr>`;
+      }).join("");
+      t.innerHTML = header + rows;
     }
     function renderOrdenes(items) {
       const t = document.getElementById("tbl-ordenes");
@@ -698,6 +771,64 @@
         refresh();
       } catch (err) {
         log(`❌ Error encolando ${codigo}: ${err.message}`);
+      }
+    }
+
+    async function pedidoOnline(codigo) {
+      try {
+        const qty = parseInt(document.getElementById(`qty-online-${codigo.toLowerCase()}`).value);
+        log(`🛒 Pedido online ${codigo} x${qty} (inmediato/pendiente)`, "inv");
+        const resp = await getJson(`${host}/api/productos/pedidos/online`, {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({id_producto: codigo, cantidad: qty}),
+        });
+        if (resp.pedido_id) {
+          log(`   🧾 Pedido #${resp.pedido_id} → destino ${resp.estado_destino}`, "inv");
+        }
+        log(`   ➡️ Pendiente: ${resp.cantidad_en_pendiente}`, "inv");
+        log(`   ⚙️ Faltante en fabricación: ${resp.faltante_fabricado}`, "inv");
+        log(`   🧭 Tiempo estimado: ${resp.tiempo_estimado} min`, "inv");
+        refresh();
+      } catch (err) {
+        log(`❌ Error en pedido online ${codigo}: ${err.message}`, "inv");
+      }
+    }
+
+    async function pedidoLocal(codigo) {
+      try {
+        const qty = parseInt(document.getElementById(`qty-local-${codigo.toLowerCase()}`).value);
+        log(`🏬 Pedido local ${codigo} x${qty} (Reserva/Fabricación)`, "inv");
+        const resp = await getJson(`${host}/api/productos/pedidos/local`, {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({id_producto: codigo, cantidad: qty}),
+        });
+        if (resp.pedido_id) {
+          log(`   🧾 Pedido #${resp.pedido_id} → destino ${resp.estado_destino}`, "inv");
+        }
+        log(`   📦 En reserva: ${resp.cantidad_en_reserva}`, "inv");
+        log(`   ⚙️ Faltante en fabricación: ${resp.faltante_fabricado}`, "inv");
+        log(`   🧭 Tiempo estimado: ${resp.tiempo_estimado} min`, "inv");
+        refresh();
+      } catch (err) {
+        log(`❌ Error en pedido local ${codigo}: ${err.message}`, "inv");
+      }
+    }
+
+    async function confirmarRetiro(codigo) {
+      try {
+        const qty = parseInt(document.getElementById(`qty-retiro-${codigo.toLowerCase()}`).value);
+        log(`✅ Confirmando retiro en tienda ${codigo} x${qty}`, "inv");
+        const resp = await getJson(`${host}/api/productos/retiros`, {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify({id_producto: codigo, cantidad: qty}),
+        });
+        log(`   🛍️ Retirado ${resp.cantidad_retirada}, reservado restante: ${resp.reservado_restante}`, "inv");
+        refresh();
+      } catch (err) {
+        log(`❌ Error confirmando retiro ${codigo}: ${err.message}`, "inv");
       }
     }
 
