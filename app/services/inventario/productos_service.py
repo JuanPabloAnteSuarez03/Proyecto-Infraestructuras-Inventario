@@ -223,18 +223,11 @@ class InventarioProductosService:
             resultado = nuevo
 
         if estado_normalizado == "Disponible":
-            # Al recibir stock, priorizar pedidos de venta abiertos antes de dejarlo como disponible
-            self._asignar_pedidos_abiertos(codigo)
+            # Intentar satisfacer pedidos completos solo cuando hay stock suficiente
+            self._satisfacer_pedidos_completos(codigo)
             actualizado = self.repository.get_by_id((codigo, estado_normalizado))
             if actualizado:
                 resultado = actualizado
-        else:
-            # Si el ingreso fue directo a Pendiente/Reservado, ajustar los pedidos abiertos en ese destino
-            self._conciliar_pedidos_destino(
-                codigo=codigo,
-                destino=estado_normalizado,
-                cantidad_incrementada=cantidad,
-            )
 
         return resultado
 
@@ -608,6 +601,15 @@ class InventarioProductosService:
             return any(p.estado_destino == destino_norm for p in pedidos)
         return bool(pedidos)
 
+    @staticmethod
+    def _normalizar_totales_pedido(pedido: PedidoVenta) -> None:
+        """Ajusta atendido/faltante para que nunca superen la solicitud ni queden negativos."""
+        if not pedido:
+            return
+        pedido.cantidad_atendida = min(pedido.cantidad_atendida, pedido.cantidad_solicitada)
+        pedido.cantidad_faltante = max(pedido.cantidad_solicitada - pedido.cantidad_atendida, 0)
+        pedido.estado = "completado" if pedido.cantidad_faltante == 0 else "abierto"
+
     def fabricar_productos(self, producto_id: str, cantidad: int) -> dict[str, Any]:
         """
         Fabrica productos y los agrega al inventario disponible.
@@ -651,85 +653,24 @@ class InventarioProductosService:
         destino_preferido: str = "Pendiente",
     ) -> dict[str, Any]:
         """
-        Ingresa productos priorizando pedidos abiertos en un estado destino.
-        Asigna hasta cubrir el faltante y deja el remanente en Disponible.
+        Ingresa productos a Disponible y luego intenta satisfacer pedidos completos
+        (sin parciales). Si no hay pedidos abiertos, queda en Disponible.
         """
         codigo = normalize_producto_codigo(producto_id)
-        destino = normalize_estado(destino_preferido)
+
         if cantidad <= 0:
             raise ValueError("La cantidad debe ser mayor a cero")
 
-        asignado_destino = 0
-        pedidos = self.pedidos_repository.list_abiertos(codigo)
-        restante = cantidad
-
-        # Asignar a pedidos que esperan en el destino
-        for pedido in pedidos:
-            if pedido.estado_destino != destino or pedido.cantidad_faltante <= 0:
-                continue
-            mover = min(restante, pedido.cantidad_faltante)
-            if mover <= 0:
-                break
-            destino_reg = self._ensure_estado_registro(codigo, destino)
-            destino_reg = self.repository.get_by_id((codigo, destino))
-            destino_reg.cantidad += mover
-            pedido.cantidad_atendida += mover
-            pedido.cantidad_faltante -= mover
-            if pedido.cantidad_faltante <= 0:
-                pedido.cantidad_faltante = 0
-                pedido.estado = "completado"
-            asignado_destino += mover
-            restante -= mover
-            if restante <= 0:
-                break
-
-        # Asignar remanente a Disponible
-        if restante > 0:
-            self.incrementar(codigo, restante, estado="Disponible")
-
-        self.session.commit()
-        # Rebalancear por si quedó stock en Disponible y aún hay pedidos abiertos
-        self._rebalancear_pedidos(codigo)
+        self.incrementar(codigo, cantidad, estado="Disponible")
+        self._satisfacer_pedidos_completos(codigo)
+        destino_reg = self.repository.get_by_id((codigo, "Disponible"))
 
         return {
             "id_producto": codigo,
-            "destino": destino,
-            "asignado_destino": asignado_destino,
-            "remanente_disponible": restante,
+            "destino": "Disponible",
+            "cantidad_ingresada": cantidad,
+            "cantidad_final_en_destino": destino_reg.cantidad if destino_reg else 0,
         }
-
-    def _rebalancear_pedidos(self, codigo: str) -> None:
-        """
-        Usa stock Disponible para cubrir faltantes de pedidos abiertos (Pendiente/Reservado).
-        Útil cuando auto-restock agregó stock mientras había pedidos abiertos.
-        """
-        pedidos = self.pedidos_repository.list_abiertos(codigo)
-        if not pedidos:
-            return
-
-        disponible_reg = self.repository.get_by_id((codigo, "Disponible"))
-        disponible = disponible_reg.cantidad if disponible_reg else 0
-        if disponible <= 0:
-            return
-
-        for pedido in pedidos:
-            if pedido.cantidad_faltante <= 0:
-                pedido.estado = "completado"
-                continue
-            mover = min(disponible, pedido.cantidad_faltante)
-            if mover <= 0:
-                break
-            self.transferir(codigo, "Disponible", pedido.estado_destino, mover)
-            pedido.cantidad_atendida += mover
-            pedido.cantidad_faltante -= mover
-            if pedido.cantidad_faltante <= 0:
-                pedido.cantidad_faltante = 0
-                pedido.estado = "completado"
-            disponible -= mover
-            if disponible <= 0:
-                break
-
-        self.session.commit()
 
     # === Private Helper Methods ===
 
@@ -839,8 +780,12 @@ class InventarioProductosService:
 
         disponible_reg = self.repository.get_by_id((codigo, "Disponible"))
         disponible = disponible_reg.cantidad if disponible_reg else 0
+
         if disponible <= 0:
             return
+
+        self.log.info("[ASIGNAR] %s tiene %s disponible para %s pedidos abiertos",
+                      codigo, disponible, len(pedidos))
 
         for pedido in pedidos:
             if pedido.cantidad_faltante <= 0:
@@ -851,20 +796,34 @@ class InventarioProductosService:
             if mover <= 0:
                 break
 
+            self.log.info("[ASIGNAR] Pedido #%s: moviendo %s de Disponible → %s",
+                         pedido.id, mover, pedido.estado_destino)
+
             # transferir mueve stock y valida registros destino
             self.transferir(codigo, "Disponible", pedido.estado_destino, mover)
             pedido.cantidad_faltante -= mover
             pedido.cantidad_atendida += mover
+
+            # Validación: Nunca atender más de lo solicitado
+            if pedido.cantidad_atendida > pedido.cantidad_solicitada:
+                self.log.error(
+                    "[ERROR] Pedido #%s: atendido=%s > solicitado=%s",
+                    pedido.id, pedido.cantidad_atendida, pedido.cantidad_solicitada
+                )
+                raise ValueError(
+                    f"Pedido #{pedido.id}: cantidad atendida excede solicitada"
+                )
+
             if pedido.cantidad_faltante <= 0:
                 pedido.estado = "completado"
+                self.log.info("[ASIGNAR] Pedido #%s completado", pedido.id)
 
-            self.session.commit()
-            disponible_reg = self.repository.get_by_id((codigo, "Disponible"))
-            disponible = disponible_reg.cantidad if disponible_reg else 0
+            # Actualizar variable local en lugar de refrescar DB
+            disponible -= mover
             if disponible <= 0:
                 break
 
-        # Persistir estado para aquellos pedidos marcados como completados sin movimiento
+        # Un solo commit al final
         self.session.commit()
 
     def _conciliar_pedidos_destino(
@@ -903,3 +862,209 @@ class InventarioProductosService:
         )
         payload["estado"] = normalize_estado(payload.get("estado", ""))
         return payload
+
+    # === Overrides de flujo sin parciales (online/local) ===
+
+    def _satisfacer_pedidos_completos(self, codigo: str) -> None:
+        """
+        Toma pedidos abiertos y los mueve al destino SOLO si hay stock suficiente
+        para cubrir la cantidad solicitada completa. Procesa en orden FIFO.
+        """
+        pedidos = self.pedidos_repository.list_abiertos(codigo)
+        if not pedidos:
+            return
+        pedidos.sort(key=lambda p: p.id)
+
+        disponible_reg = self.repository.get_by_id((codigo, "Disponible"))
+        disponible = disponible_reg.cantidad if disponible_reg else 0
+        if disponible <= 0:
+            return
+
+        for pedido in pedidos:
+            self._normalizar_totales_pedido(pedido)
+            requerido = pedido.cantidad_faltante
+            if requerido <= 0:
+                pedido.estado = "completado"
+                continue
+            if disponible >= requerido:
+                # mover todo el pedido al destino final
+                self.transferir(codigo, "Disponible", pedido.estado_destino, requerido)
+                pedido.cantidad_atendida = pedido.cantidad_solicitada
+                pedido.cantidad_faltante = 0
+                pedido.estado = "completado"
+                disponible -= requerido
+                if disponible_reg:
+                    disponible_reg.cantidad = disponible
+            else:
+                break
+
+        self.session.commit()
+
+    def ingresar_entrega_prioritaria(
+        self,
+        producto_id: str,
+        cantidad: int,
+        destino_preferido: str = "Pendiente",
+    ) -> dict[str, Any]:
+        """
+        Ingresa productos a Disponible y luego intenta satisfacer pedidos completos.
+        Ya no reparte parciales a Pendiente/Reservado.
+        """
+        codigo = normalize_producto_codigo(producto_id)
+        if cantidad <= 0:
+            raise ValueError("La cantidad debe ser mayor a cero")
+
+        self.incrementar(codigo, cantidad, estado="Disponible")
+        self._satisfacer_pedidos_completos(codigo)
+        destino_reg = self.repository.get_by_id((codigo, "Disponible"))
+
+        return {
+            "id_producto": codigo,
+            "destino": "Disponible",
+            "cantidad_ingresada": cantidad,
+            "cantidad_final_en_destino": destino_reg.cantidad if destino_reg else 0,
+        }
+
+    def procesar_pedido_online(self, producto_id: str, cantidad: int) -> dict[str, Any]:
+        """
+        Pedido online sin parciales:
+        - Si hay stock completo: mover a A Despacho y cerrar.
+        - Si falta stock: fabricar faltante; cuando Disponible cubra toda la orden, mover todo a Pendiente.
+        """
+        codigo = normalize_producto_codigo(producto_id)
+        if cantidad <= 0:
+            raise ValueError("Cantidad debe ser mayor a cero")
+
+        disponible_reg = self.repository.get_by_id((codigo, "Disponible"))
+        disponible = disponible_reg.cantidad if disponible_reg else 0
+
+        if disponible >= cantidad:
+            self.transferir(codigo, "Disponible", "A Despacho", cantidad)
+            pedido = self._crear_pedido_venta(
+                tipo="online",
+                codigo=codigo,
+                cantidad_solicitada=cantidad,
+                cantidad_atendida=cantidad,
+                cantidad_faltante=0,
+                estado_destino="A Despacho",
+            )
+            return {
+                "id_producto": codigo,
+                "pedido_id": pedido.id if pedido else None,
+                "cantidad_solicitada": cantidad,
+                "cantidad_en_pendiente": 0,
+                "cantidad_inmediata": cantidad,
+                "faltante_fabricado": 0,
+                "tiempo_estimado": 0,
+                "estado_destino": "A Despacho",
+                "orden_id": None,
+                "orden_estado": None,
+                "estado_pedido": "completado",
+            }
+
+        faltante = cantidad - disponible
+        orchestrator = FabricacionOrchestrator(
+            session=self.session,
+            fabricacion_service=self.manufacturing_helper.fabricacion_service,
+        )
+        resultado = orchestrator.crear_orden(codigo, faltante)
+        tiempo_estimado = resultado.get("tiempo_estimado", 0) or 0
+        orden_id = resultado.get("id") if isinstance(resultado, dict) else None
+        orden_estado = resultado.get("estado") if isinstance(resultado, dict) else None
+
+        pedido = self._crear_pedido_venta(
+            tipo="online",
+            codigo=codigo,
+            cantidad_solicitada=cantidad,
+            cantidad_atendida=0,
+            cantidad_faltante=cantidad,
+            estado_destino="Pendiente",
+        )
+
+        self._satisfacer_pedidos_completos(codigo)
+        pendiente_reg = self.repository.get_by_id((codigo, "Pendiente"))
+        return {
+            "id_producto": codigo,
+            "pedido_id": pedido.id if pedido else None,
+            "cantidad_solicitada": cantidad,
+            "cantidad_en_pendiente": pendiente_reg.cantidad if pendiente_reg else 0,
+            "cantidad_inmediata": 0,
+            "faltante_fabricado": faltante,
+            "tiempo_estimado": tiempo_estimado,
+            "estado_destino": "Pendiente",
+            "orden_id": orden_id,
+            "orden_estado": orden_estado,
+            "estado_pedido": pedido.estado if pedido else "abierto",
+        }
+
+    def procesar_pedido_local(self, producto_id: str, cantidad: int) -> dict[str, Any]:
+        """
+        Pedido local sin parciales:
+        - Si hay stock completo: mover a Reservado y cerrar.
+        - Si falta stock: fabricar faltante; cuando Disponible cubra toda la orden, mover todo a Reservado.
+        """
+        codigo = normalize_producto_codigo(producto_id)
+        if cantidad <= 0:
+            raise ValueError("Cantidad debe ser mayor a cero")
+
+        disponible_reg = self.repository.get_by_id((codigo, "Disponible"))
+        disponible = disponible_reg.cantidad if disponible_reg else 0
+
+        if disponible >= cantidad:
+            self.transferir(codigo, "Disponible", "Reservado", cantidad)
+            pedido = self._crear_pedido_venta(
+                tipo="local",
+                codigo=codigo,
+                cantidad_solicitada=cantidad,
+                cantidad_atendida=cantidad,
+                cantidad_faltante=0,
+                estado_destino="Reservado",
+            )
+            reservado_reg = self.repository.get_by_id((codigo, "Reservado"))
+            return {
+                "id_producto": codigo,
+                "pedido_id": pedido.id if pedido else None,
+                "cantidad_solicitada": cantidad,
+                "cantidad_en_reserva": reservado_reg.cantidad if reservado_reg else 0,
+                "faltante_fabricado": 0,
+                "tiempo_estimado": 0,
+                "estado_destino": "Reservado",
+                "orden_id": None,
+                "orden_estado": None,
+                "estado_pedido": "completado",
+            }
+
+        faltante = cantidad - disponible
+        orchestrator = FabricacionOrchestrator(
+            session=self.session,
+            fabricacion_service=self.manufacturing_helper.fabricacion_service,
+        )
+        resultado_fabricacion = orchestrator.crear_orden(codigo, faltante)
+        tiempo_estimado = resultado_fabricacion.get("tiempo_estimado", 0) or 0
+        orden_id = resultado_fabricacion.get("id") if isinstance(resultado_fabricacion, dict) else None
+        orden_estado = resultado_fabricacion.get("estado") if isinstance(resultado_fabricacion, dict) else None
+
+        pedido = self._crear_pedido_venta(
+            tipo="local",
+            codigo=codigo,
+            cantidad_solicitada=cantidad,
+            cantidad_atendida=0,
+            cantidad_faltante=cantidad,
+            estado_destino="Reservado",
+        )
+
+        self._satisfacer_pedidos_completos(codigo)
+
+        reservado_reg = self.repository.get_by_id((codigo, "Reservado"))
+        return {
+            "id_producto": codigo,
+            "pedido_id": pedido.id if pedido else None,
+            "cantidad_solicitada": cantidad,
+            "cantidad_en_reserva": reservado_reg.cantidad if reservado_reg else 0,
+            "faltante_fabricado": faltante,
+            "tiempo_estimado": tiempo_estimado,
+            "estado_destino": "Reservado",
+            "orden_id": orden_id,
+            "orden_estado": orden_estado,
+            "estado_pedido": pedido.estado if pedido else "abierto",
+        }

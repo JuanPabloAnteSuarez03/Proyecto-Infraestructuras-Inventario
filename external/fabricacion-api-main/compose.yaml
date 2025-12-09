@@ -28,7 +28,7 @@ services:
       DB_HOST: db
       DB_PORT: 5432
       DB_NAME: fabricacion_db
-      API_PATH_INVENTARIO: http://host.docker.internal:5050/api/productos/ingresos
+      API_PATH_INVENTARIO: http://host.docker.internal:5050/api/fabricacion/webhook/productos_terminados
     ports:
       - "8555:8000"
     extra_hosts:

@@ -55,12 +55,23 @@ def create_app(config_name: str | None = None) -> FastAPI:
         return any(activos)
 
     def _hay_ordenes_abiertas(ordenes_service: OrdenesFabricacionService) -> bool:
-        """True si existe alguna orden no finalizada (para pausar auto-restock de productos)."""
-        abiertos = (
-            o for o in ordenes_service.list()
-            if o.estado not in ("completada", "fallida", "confirmacion_fallida")
-        )
-        return any(abiertos)
+        """
+        True si existe alguna orden no finalizada (para pausar auto-restock de productos).
+        También cierra órdenes cuyo detalle indique entrega completa aunque el estado no se haya actualizado.
+        """
+        abiertos: list = []
+        for o in ordenes_service.list():
+            if o.estado in ("completada", "fallida", "confirmacion_fallida"):
+                continue
+            # Si por alguna razón el estado no se cerró pero la entrega está completa, cerrarlo aquí
+            detalle = o.detalle if isinstance(o.detalle, dict) else {}
+            entrega_acum = detalle.get("entrega_acumulada", 0)
+            if entrega_acum >= o.cantidad:
+                o.estado = "completada"
+                ordenes_service.session.commit()
+                continue
+            abiertos.append(o)
+        return bool(abiertos)
 
     def _verificar_productos(session, log) -> None:
         productos_service = InventarioProductosService(session)
@@ -68,10 +79,12 @@ def create_app(config_name: str | None = None) -> FastAPI:
 
         # Pausar si hay órdenes abiertas para no solapar con pedidos en curso
         if _hay_ordenes_abiertas(ordenes_service):
-            log.debug("[AUTO_STOCK] Se omite reposición de productos: hay órdenes abiertas.")
+            log.info("[AUTO_STOCK] Se omite reposición de productos: hay órdenes abiertas.")
             return
 
         codigos = {p.id_producto for p in productos_service.list()}
+        if not codigos:
+            log.debug("[AUTO_STOCK] No hay productos registrados para verificar.")
         for codigo in codigos:
             info = productos_service._evaluar_stock_minimo(codigo)
             if info.get("accion") != "fabricar":

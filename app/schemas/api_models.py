@@ -135,3 +135,7 @@ class SolicitudPiezaAsync(BaseModel):
 class OrdenFabricacionAsync(BaseModel):
     id_producto: str
     cantidad: int
+
+
+class EntregaOrden(BaseModel):
+    cantidad: int

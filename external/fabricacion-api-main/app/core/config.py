@@ -10,7 +10,9 @@ DB_PORT = os.getenv("DB_PORT", "5432")
 DB_NAME = os.getenv("DB_NAME", "fabricacion_db")
 
 #Rutas de inventario
-API_PATH_INVENTARIO = os.getenv("API_PATH_INVENTARIO", "localhost")
+WEBHOOK_DEFAULT = "http://host.docker.internal:5050/api/fabricacion/webhook/productos_terminados"
+# Debe apuntar al webhook de productos terminados para que el dashboard reciba progreso de órdenes.
+API_PATH_INVENTARIO = os.getenv("API_PATH_INVENTARIO", WEBHOOK_DEFAULT)
 MAX_WORKERS = int(os.getenv("MAX_WORKERS", 6))
 
 # Para Postgres:

@@ -11,6 +11,7 @@ from ..schemas.api_models import (
     PedidoOnline,
     PedidoLocal,
     RetiroLocal,
+    EntregaOrden,
 )
 from ..domain.inventario import PRODUCT_STATES
 from ..database import get_db
@@ -141,25 +142,22 @@ def actualizar_producto(
 def incrementar_producto(body: IngresoProducto, db: Session = Depends(get_db)):
     service = InventarioProductosService(db)
     payload = body.model_dump()
-    logger.info("[INGRESO DEBUG] Payload recibido: %s", payload)
     codigo = payload.get("id_producto")
     cantidad = payload.get("cantidad")
     estado = payload.get("estado") or "Disponible"
 
+    logger.info("[INGRESO] %s: +%s en estado %s", codigo, cantidad, estado)
+
     try:
+        # Solo incrementar inventario - esto ya maneja la asignación a pedidos abiertos
         producto = service.incrementar(
             producto_id=codigo,
             estado=estado,
             cantidad=cantidad,
         )
 
-        estados_objetivo = ("esperando_fabricacion", "consumiendo_piezas", "confirmado")
-        entregas_service = EntregasFabricacionService(db)
-        entregas_service.registrar_entrega(
-            codigo=codigo,
-            cantidad=cantidad,
-            estados_objetivo=estados_objetivo,
-        )
+        logger.info("[INGRESO] ✓ %s ahora tiene %s en %s",
+                   codigo, producto.cantidad, estado)
 
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -234,5 +232,37 @@ def confirmar_retiro(body: RetiroLocal, db: Session = Depends(get_db)):
     payload = body.model_dump()
     try:
         return service.confirmar_retiro_local(payload["id_producto"], payload["cantidad"])
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/ordenes/{orden_id}/entregas")
+def registrar_entrega_orden(
+    orden_id: int,
+    body: EntregaOrden,
+    db: Session = Depends(get_db)
+):
+    """
+    Registra que una entrega llegó para una orden específica.
+    NO incrementa inventario - solo actualiza el estado de la orden.
+    El inventario debe ingresarse por separado usando POST /ingresos.
+    """
+    entregas_service = EntregasFabricacionService(db)
+    cantidad = body.cantidad
+
+    logger.info("[ENTREGA_ORDEN] Registrando entrega para orden #%s: cantidad=%s",
+               orden_id, cantidad)
+
+    try:
+        resultado = entregas_service.registrar_entrega_por_orden_id(
+            orden_id=orden_id,
+            cantidad=cantidad
+        )
+
+        if not resultado:
+            raise HTTPException(404, f"Orden #{orden_id} no encontrada")
+
+        return resultado
+
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
