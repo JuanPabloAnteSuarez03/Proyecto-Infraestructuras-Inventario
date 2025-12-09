@@ -76,6 +76,24 @@ class InventarioProductosService:
         """
         return self.repository.get_all()
 
+    def list_by_estado(self, estado: str) -> list[InventarioProducto]:
+        """
+        Obtiene todos los productos en un estado específico.
+
+        Args:
+            estado: Estado del producto (Disponible, Reservado, A Despacho, Pendiente)
+
+        Returns:
+            Registros del inventario que coinciden con el estado
+        """
+        estado_normalizado = normalize_estado(estado)
+        return (
+            self.session.query(InventarioProducto)
+            .filter_by(estado=estado_normalizado)
+            .order_by(InventarioProducto.id_producto)
+            .all()
+        )
+
     def list_by_producto(self, producto_id: str) -> list[InventarioProducto]:
         """
         Obtiene todos los estados de un producto específico.
@@ -171,6 +189,30 @@ class InventarioProductosService:
         updated = self.session.query(InventarioProducto).update({"cantidad": 0})
         self.session.commit()
         return updated
+
+    def descontar_estado(
+        self, producto_id: str, estado: str, cantidad: int
+    ) -> InventarioProducto:
+        """
+        Descuenta cantidad de un estado específico (Pendiente, A Despacho, etc.).
+        Lanza error si no existe el registro o si no hay stock suficiente.
+        """
+        codigo = normalize_producto_codigo(producto_id)
+        estado_normalizado = normalize_estado(estado)
+
+        if cantidad <= 0:
+            raise ValueError("La cantidad debe ser mayor a cero")
+
+        registro = self.repository.get_by_id((codigo, estado_normalizado))
+        if not registro:
+            raise ValueError("Producto no encontrado en el estado solicitado")
+        if registro.cantidad < cantidad:
+            raise ValueError("Cantidad insuficiente en el estado solicitado")
+
+        registro.cantidad -= cantidad
+        self.session.commit()
+        self.session.refresh(registro)
+        return registro
 
     # === Inventory Operations ===
 

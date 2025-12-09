@@ -70,6 +70,13 @@ def listar_productos(db: Session = Depends(get_db)):
     return _with_missing_states([serialize_producto(p) for p in productos])
 
 
+@router.get("/pendientes")
+def listar_productos_pendientes(db: Session = Depends(get_db)):
+    service = InventarioProductosService(db)
+    productos = service.list_by_estado("Pendiente")
+    return [serialize_producto(p) for p in productos]
+
+
 @router.get("/pedidos")
 def listar_pedidos(estado: str | None = None, db: Session = Depends(get_db)):
     service = InventarioProductosService(db)
@@ -232,6 +239,36 @@ def confirmar_retiro(body: RetiroLocal, db: Session = Depends(get_db)):
     payload = body.model_dump()
     try:
         return service.confirmar_retiro_local(payload["id_producto"], payload["cantidad"])
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/pendientes/descontar")
+def descontar_pendiente(body: Despacho, db: Session = Depends(get_db)):
+    service = InventarioProductosService(db)
+    payload = body.model_dump()
+    try:
+        producto = service.descontar_estado(
+            producto_id=payload["id_producto"],
+            estado="Pendiente",
+            cantidad=payload["cantidad"],
+        )
+        return serialize_producto(producto)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/despachos/descontar")
+def descontar_despacho(body: Despacho, db: Session = Depends(get_db)):
+    service = InventarioProductosService(db)
+    payload = body.model_dump()
+    try:
+        producto = service.descontar_estado(
+            producto_id=payload["id_producto"],
+            estado="A Despacho",
+            cantidad=payload["cantidad"],
+        )
+        return serialize_producto(producto)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 

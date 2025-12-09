@@ -149,6 +149,53 @@ def test_incrementar_productos(client):
     assert ingreso_invalido.status_code == 400
 
 
+def test_listar_productos_pendientes(client):
+    crear_estados_producto(client, "S1", ["Pendiente"])
+    crear_estados_producto(client, "S2", ["Pendiente", "Disponible"])
+
+    resp1 = client.put("/api/productos/S1/Pendiente", json={"cantidad": 7})
+    resp2 = client.put("/api/productos/S2/Pendiente", json={"cantidad": 3})
+    assert resp1.status_code == 200
+    assert resp2.status_code == 200
+
+    listado = client.get("/api/productos/pendientes")
+    assert listado.status_code == 200
+    data = listado.json()
+    assert len(data) == 2
+    assert all(item["estado"] == "Pendiente" for item in data)
+    cantidades = {(item["id_producto"], item["estado"]): item["cantidad"] for item in data}
+    assert cantidades[("S1", "Pendiente")] == 7
+    assert cantidades[("S2", "Pendiente")] == 3
+
+
+def test_descontar_pendiente_y_despacho(client):
+    crear_estados_producto(client, "S1", ["Pendiente", "A Despacho"])
+
+    set_pendiente = client.put("/api/productos/S1/Pendiente", json={"cantidad": 10})
+    set_despacho = client.put("/api/productos/S1/A Despacho", json={"cantidad": 5})
+    assert set_pendiente.status_code == 200
+    assert set_despacho.status_code == 200
+
+    restar_pendiente = client.post(
+        "/api/productos/pendientes/descontar",
+        json={"id_producto": "S1", "cantidad": 4},
+    )
+    restar_despacho = client.post(
+        "/api/productos/despachos/descontar",
+        json={"id_producto": "S1", "cantidad": 2},
+    )
+    assert restar_pendiente.status_code == 200
+    assert restar_despacho.status_code == 200
+    assert restar_pendiente.json()["cantidad"] == 6
+    assert restar_despacho.json()["cantidad"] == 3
+
+    insuficiente = client.post(
+        "/api/productos/pendientes/descontar",
+        json={"id_producto": "S1", "cantidad": 999},
+    )
+    assert insuficiente.status_code == 400
+
+
 def test_proveedores_y_piezas_flow(client):
     proveedor_resp = client.post(
         "/api/proveedores",
