@@ -196,6 +196,27 @@ def test_descontar_pendiente_y_despacho(client):
     assert insuficiente.status_code == 400
 
 
+def test_retiro_consumiendo_reservado_y_disponible(client):
+    crear_estados_producto(client, "S1", ["Reservado", "Disponible"])
+    resp_res = client.put("/api/productos/S1/Reservado", json={"cantidad": 3})
+    resp_disp = client.put("/api/productos/S1/Disponible", json={"cantidad": 10})
+    assert resp_res.status_code == 200
+    assert resp_disp.status_code == 200
+
+    retiro = client.post(
+        "/api/productos/retiros", json={"id_producto": "S1", "cantidad": 5}
+    )
+    assert retiro.status_code == 200
+    data = retiro.json()
+    assert data["reservado_restante"] == 0
+    assert data["disponible_restante"] == 8
+
+    insuficiente = client.post(
+        "/api/productos/retiros", json={"id_producto": "S1", "cantidad": 20}
+    )
+    assert insuficiente.status_code == 400
+
+
 def test_proveedores_y_piezas_flow(client):
     proveedor_resp = client.post(
         "/api/proveedores",

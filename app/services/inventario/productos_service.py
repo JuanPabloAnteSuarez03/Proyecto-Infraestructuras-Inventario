@@ -613,20 +613,38 @@ class InventarioProductosService:
         }
 
     def confirmar_retiro_local(self, producto_id: str, cantidad: int) -> dict[str, Any]:
-        """Descuenta stock reservado cuando se retira en tienda."""
+        """Descuenta stock reservado cuando se retira en tienda.
+
+        Si no hay suficiente en Reservado, consume de Disponible para cubrir el resto.
+        """
         codigo = normalize_producto_codigo(producto_id)
         if cantidad <= 0:
             raise ValueError("Cantidad debe ser mayor a cero")
+
         reservado = self.repository.get_by_id((codigo, "Reservado"))
-        if not reservado or reservado.cantidad < cantidad:
-            raise ValueError("Cantidad insuficiente en Reservado para retirar")
-        reservado.cantidad -= cantidad
+        disponible = self.repository.get_by_id((codigo, "Disponible"))
+        total_disponible = (reservado.cantidad if reservado else 0) + (disponible.cantidad if disponible else 0)
+        if total_disponible < cantidad:
+            raise ValueError("Cantidad insuficiente para retirar")
+
+        restante = cantidad
+        if reservado and reservado.cantidad > 0:
+            usar_reservado = min(restante, reservado.cantidad)
+            reservado.cantidad -= usar_reservado
+            restante -= usar_reservado
+
+        if restante > 0:
+            # Consumir de Disponible si queda saldo por retirar
+            if not disponible or disponible.cantidad < restante:
+                raise ValueError("Cantidad insuficiente para retirar")
+            disponible.cantidad -= restante
+
         self.session.commit()
-        self.session.refresh(reservado)
         return {
             "id_producto": codigo,
             "cantidad_retirada": cantidad,
-            "reservado_restante": reservado.cantidad,
+            "reservado_restante": reservado.cantidad if reservado else 0,
+            "disponible_restante": disponible.cantidad if disponible else 0,
         }
 
     def list_pedidos(self, solo_abiertos: bool = False) -> list[PedidoVenta]:
