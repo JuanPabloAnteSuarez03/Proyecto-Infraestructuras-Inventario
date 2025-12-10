@@ -85,6 +85,13 @@ def listar_pedidos(estado: str | None = None, db: Session = Depends(get_db)):
     return [serialize_pedido(p) for p in pedidos]
 
 
+@router.post("/pedidos/reset")
+def resetear_pedidos(db: Session = Depends(get_db)):
+    service = InventarioProductosService(db)
+    total = service.reset_pedidos()
+    return {"message": "Pedidos de venta reseteados", "registros": total}
+
+
 @router.get("/{producto_id}")
 def listar_estados_producto(producto_id: str, db: Session = Depends(get_db)):
     service = InventarioProductosService(db)
@@ -238,7 +245,11 @@ def confirmar_retiro(body: RetiroLocal, db: Session = Depends(get_db)):
     service = InventarioProductosService(db)
     payload = body.model_dump()
     try:
-        return service.confirmar_retiro_local(payload["id_producto"], payload["cantidad"])
+        return service.confirmar_retiro(
+            producto_id=payload["id_producto"],
+            cantidad=payload["cantidad"],
+            metodo_entrega=payload.get("metodo_entrega"),
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 

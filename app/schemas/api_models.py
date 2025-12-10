@@ -71,6 +71,29 @@ class PedidoLocal(BaseModel):
 class RetiroLocal(BaseModel):
     id_producto: str
     cantidad: int
+    metodo_entrega: str | None = "tienda"
+
+    @field_validator("metodo_entrega")
+    @classmethod
+    def normalize_metodo_entrega(cls, value: str | None) -> str:
+        """Normaliza valores como PICKUP/DISPATCH a tienda/domicilio."""
+        if value is None:
+            return "tienda"
+        raw = (value or "").strip().lower()
+        mapping = {
+            "pickup": "tienda",
+            "store": "tienda",
+            "local": "tienda",
+            "tienda": "tienda",
+            "dispatch": "domicilio",
+            "delivery": "domicilio",
+            "domicilio": "domicilio",
+            "envio": "domicilio",
+        }
+        normalized = mapping.get(raw, raw)
+        if normalized not in {"tienda", "domicilio"}:
+            raise ValueError("metodo_entrega debe ser tienda o domicilio")
+        return normalized
 
 
 class PiezaCreate(BaseModel):

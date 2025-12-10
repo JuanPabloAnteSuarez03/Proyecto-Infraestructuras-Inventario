@@ -217,6 +217,67 @@ def test_retiro_consumiendo_reservado_y_disponible(client):
     assert insuficiente.status_code == 400
 
 
+def test_retiro_domicilio_mueve_a_despacho(client):
+    crear_estados_producto(client, "S1", ["Reservado", "Pendiente", "A Despacho", "Disponible"])
+
+    # Caso 1: finalizar venta pendiente (usa Reservado completo -> A Despacho; no toca Pendiente)
+    resp_res = client.put("/api/productos/S1/Reservado", json={"cantidad": 7})
+    resp_disp = client.put("/api/productos/S1/Disponible", json={"cantidad": 10})
+    assert resp_res.status_code == 200
+    assert resp_disp.status_code == 200
+
+    pendiente_finalizada = client.post(
+        "/api/productos/retiros",
+        json={"id_producto": "S1", "cantidad": 7, "metodo_entrega": "domicilio"},
+    )
+    assert pendiente_finalizada.status_code == 200
+    data = pendiente_finalizada.json()
+    assert data["metodo_entrega"] == "domicilio"
+    assert data["estado_destino"] == "A Despacho"
+    assert data["despacho_total"] == 7
+    assert data["pendiente_total"] == 0
+    assert data["movido_desde_reservado"] == 7
+    assert data["movido_desde_pendiente"] == 0
+    assert data["movido_desde_disponible"] == 0
+    assert data["reservado_restante"] == 0
+    assert data["pendiente_restante"] == 0
+    assert data["despacho_restante"] == 7
+    assert data["disponible_restante"] == 10
+
+    # Caso 2: venta directa a domicilio (usa solo Disponible -> A Despacho)
+    venta_directa = client.post(
+        "/api/productos/retiros",
+        json={"id_producto": "S1", "cantidad": 4, "metodo_entrega": "domicilio"},
+    )
+    assert venta_directa.status_code == 200
+    data2 = venta_directa.json()
+    assert data2["despacho_total"] == 11
+    assert data2["pendiente_total"] == 0
+    assert data2["movido_desde_reservado"] == 0
+    assert data2["movido_desde_pendiente"] == 0
+    assert data2["movido_desde_disponible"] == 4
+    assert data2["despacho_restante"] == 11
+    assert data2["disponible_restante"] == 6
+
+    # Caso 3: stock insuficiente -> mueve a Pendiente y fabrica faltante
+    client.put("/api/productos/S1/Reservado", json={"cantidad": 0})
+    client.put("/api/productos/S1/Disponible", json={"cantidad": 5})
+    fabrica_y_mueve = client.post(
+        "/api/productos/retiros",
+        json={"id_producto": "S1", "cantidad": 10, "metodo_entrega": "domicilio"},
+    )
+    assert fabrica_y_mueve.status_code == 200
+    data3 = fabrica_y_mueve.json()
+    assert data3["estado_destino"] == "Pendiente"
+    assert data3["pendiente_total"] == 10  # 5 disponibles + 5 fabricados
+    assert data3["movido_desde_reservado"] == 0
+    assert data3["movido_desde_disponible"] == 10  # incluye fabricados movidos
+    assert data3["faltante_fabricado"] == 5
+    assert data3["despacho_total"] == 11  # de casos previos
+    assert data3["disponible_restante"] == 0
+    assert data3["tiempo_estimado"] >= 0
+
+
 def test_proveedores_y_piezas_flow(client):
     proveedor_resp = client.post(
         "/api/proveedores",

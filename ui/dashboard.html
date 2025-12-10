@@ -106,6 +106,7 @@
           <button onclick="resetPiezas()" style="background:#f97316;color:#fff;">Reset piezas</button>
           <button onclick="resetSolicitudes()" style="background:#6366f1;color:#fff;">Reset solicitudes piezas</button>
           <button onclick="resetOrdenes()" style="background:#0ea5e9;color:#fff;">Reset órdenes fabricación</button>
+          <button onclick="resetPedidos()" style="background:#0d9488;color:#fff;">Reset pedidos venta</button>
         </div>
       </div>
     </div>
@@ -191,6 +192,10 @@
             <input type="number" id="qty-local-s1" value="300" min="1" step="50" style="width: 120px; padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
             <button onclick="pedidoLocal('S1')" style="background:#22c55e;">Reservar/Fabricar</button>
             <input type="number" id="qty-retiro-s1" value="100" min="1" step="10" style="width: 100px; padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
+            <select id="delivery-s1" style="padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
+              <option value="tienda">Retiro en tienda</option>
+              <option value="domicilio">Envío a domicilio</option>
+            </select>
             <button onclick="confirmarRetiro('S1')" style="background:#f97316;">Retiro</button>
           </div>
         </div>
@@ -200,6 +205,10 @@
             <input type="number" id="qty-local-s2" value="300" min="1" step="50" style="width: 120px; padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
             <button onclick="pedidoLocal('S2')" style="background:#22c55e;">Reservar/Fabricar</button>
             <input type="number" id="qty-retiro-s2" value="100" min="1" step="10" style="width: 100px; padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
+            <select id="delivery-s2" style="padding: 6px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text);">
+              <option value="tienda">Retiro en tienda</option>
+              <option value="domicilio">Envío a domicilio</option>
+            </select>
             <button onclick="confirmarRetiro('S2')" style="background:#f97316;">Retiro</button>
           </div>
         </div>
@@ -571,6 +580,17 @@
       }
     }
 
+    async function resetPedidos() {
+      try {
+        log("♻️ Reseteando pedidos de venta...", "send");
+        await getJson(`${host}/api/productos/pedidos/reset`, {method: "POST"});
+        log("✅ Pedidos de venta reseteados", "inv");
+        refresh();
+      } catch (err) {
+        log(`❌ Error reseteando pedidos: ${err.message}`, "inv");
+      }
+    }
+
     async function getJson(url, opts = {}) {
       const res = await fetch(url, opts);
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
@@ -819,11 +839,13 @@
     async function confirmarRetiro(codigo) {
       try {
         const qty = parseInt(document.getElementById(`qty-retiro-${codigo.toLowerCase()}`).value);
-        log(`✅ Confirmando retiro en tienda ${codigo} x${qty}`, "inv");
+        const metodo = document.getElementById(`delivery-${codigo.toLowerCase()}`).value || "tienda";
+        const metodoLabel = metodo === "domicilio" ? "envío a domicilio" : "retiro en tienda";
+        log(`✅ Confirmando ${metodoLabel} ${codigo} x${qty}`, "inv");
         const resp = await getJson(`${host}/api/productos/retiros`, {
           method: "POST",
           headers: {"Content-Type":"application/json"},
-          body: JSON.stringify({id_producto: codigo, cantidad: qty}),
+          body: JSON.stringify({id_producto: codigo, cantidad: qty, metodo_entrega: metodo}),
         });
         log(`   🛍️ Retirado ${resp.cantidad_retirada}, reservado restante: ${resp.reservado_restante}`, "inv");
         refresh();
