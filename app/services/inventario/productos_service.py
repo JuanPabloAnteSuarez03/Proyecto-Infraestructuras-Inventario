@@ -420,16 +420,19 @@ class InventarioProductosService:
         """
         Finalizar venta (botón *Finalizar venta* en el frontend).
 
-        - Si YA hubo "Guardar pendiente" (es decir, hay reservas / pendientes),
+        - Si YA hubo "Guardar pendiente" (es decir, hay stock en RESERVADO),
           usa los flujos clásicos:
             * tienda    -> confirmar_retiro_local
             * domicilio -> preparar_despacho_domicilio
 
-        - Si NO hubo "Guardar pendiente" (no hay reservas ni pendientes
-          para el producto), se considera
-          FINALIZAR VENTA DIRECTA:
+        - Si NO hubo "Guardar pendiente" (no hay nada en Reservado para el producto),
+          se considera FINALIZAR VENTA DIRECTA:
             * tienda    -> _finalizar_directo_tienda
             * domicilio -> _finalizar_directo_domicilio
+
+        Importante:
+        - NO usamos el estado Pendiente para decidir si hubo o no "Guardar pendiente",
+          porque Pendiente también se utiliza en ventas DIRECTAS a domicilio.
         """
         if cantidad <= 0:
             raise ValueError("La cantidad debe ser mayor a cero")
@@ -450,20 +453,13 @@ class InventarioProductosService:
 
         # --- Detectar si existe contexto de "Guardar pendiente" previo ---
         reservado = self.repository.get_by_id((codigo, "Reservado"))
-        pendiente = self.repository.get_by_id((codigo, "Pendiente"))
-
         reservado_cant = reservado.cantidad if reservado else 0
-        pendiente_cant = pendiente.cantidad if pendiente else 0
 
-        # IMPORTANTE:
-        # Consideramos que hubo "Guardar pendiente" SOLO si hay algo en
-        # Reservado o Pendiente. No usamos pedidos abiertos aquí para
-        # que los flujos directos sean realmente independientes.
-        hay_reserva_o_pendiente = (reservado_cant > 0) or (pendiente_cant > 0)
+        hay_reserva = reservado_cant > 0
 
-        # --- Rutas según método de entrega y si hay o no reserva/pedidos ---
+        # --- Rutas según método de entrega y si hay o no reserva ---
         if metodo == "tienda":
-            if hay_reserva_o_pendiente:
+            if hay_reserva:
                 # Flujo clásico: confirmar retiro usando Reservado (+Disponible)
                 return self.confirmar_retiro_local(producto_id, cantidad)
             else:
@@ -475,8 +471,8 @@ class InventarioProductosService:
                 )
 
         if metodo == "domicilio":
-            if hay_reserva_o_pendiente:
-                # Flujo clásico (viene de Guardar pendiente)
+            if hay_reserva:
+                # Flujo clásico (viene de Guardar pendiente: Reservado + Disponible)
                 return self.preparar_despacho_domicilio(producto_id, cantidad)
             else:
                 # Flujo DIRECTO domicilio: solo Disponible
@@ -558,8 +554,9 @@ class InventarioProductosService:
            - Al finalizar, se mueve la cantidad pedida de Reservado -> A Despacho.
 
         Además:
-        - Si NO hay nada en Reservado pero sí hay stock suficiente en Disponible,
-          se interpreta como flujo directo y se hace Disponible -> A Despacho.
+        - Si NO hay nada en Reservado pero sí hay stock suficiente en Disponible
+          y el frontend llama directamente aquí, se interpreta como flujo directo
+          y se hace Disponible -> A Despacho.
         """
         codigo = normalize_producto_codigo(producto_id)
         if cantidad <= 0:
@@ -581,9 +578,6 @@ class InventarioProductosService:
             )
 
         # --- CASO ESPECIAL: sin reserva pero stock suficiente en Disponible ---
-        # Esto puede ocurrir si el frontend llama directamente a este método
-        # sin pasar por Guardar pendiente. En ese caso, nos comportamos
-        # como venta directa: Disponible -> A Despacho.
         if reservado_cant == 0 and disponible_cant >= cantidad:
             self.transferir(codigo, "Disponible", "A Despacho", cantidad)
 
@@ -675,7 +669,7 @@ class InventarioProductosService:
         'Guardar pendiente'. (El frontend puede llamarlo directamente si quiere.)
 
         Internamente hace lo mismo que confirmar_retiro cuando detecta
-        que no hay reservas/pedidos.
+        que no hay reservas.
         """
         codigo = normalize_producto_codigo(producto_id)
         if cantidad <= 0:
@@ -1352,6 +1346,7 @@ class InventarioProductosService:
                 continue
 
             if disponible >= requerido:
+                # mover todo el pedido al destino final (ej: Disponible -> Reservado)
                 self.transferir(codigo, "Disponible", pedido.estado_destino, requerido)
                 pedido.cantidad_atendida = pedido.cantidad_solicitada
                 pedido.cantidad_faltante = 0
