@@ -42,8 +42,9 @@ class InventarioProductosService:
 
     3) Finalizar venta DIRECTA (tienda) SIN haber hecho "Guardar pendiente":
        - Stock suficiente: descuenta directamente desde Disponible.
-       - Stock insuficiente: mueve lo disponible a Reservado y encola fabricación del faltante,
-         registrando un PedidoVenta local (similar a Guardar pendiente, pero desde Finalizar).
+       - Stock insuficiente: NO reserva nada. Se crea un PedidoVenta local
+         cuyo destino es Disponible. Cuando el stock Disponible alcanza la
+         cantidad del pedido, se descuenta automáticamente desde Disponible.
 
     ONLINE (domicilio)
     -------------------
@@ -658,7 +659,6 @@ class InventarioProductosService:
 
     # ============================================================
     # VENTAS – Finalizar venta DIRECTA (sin haber guardado pendiente)
-    # (también se usan desde confirmar_retiro)
     # ============================================================
 
     def finalizar_venta_directa(
@@ -710,6 +710,12 @@ class InventarioProductosService:
     ) -> dict[str, Any]:
         """
         Caso DIRECTO: venta local (tienda) sin pasar por Guardar pendiente.
+
+        - Stock suficiente: descuenta directamente desde Disponible.
+        - Stock insuficiente: NO se mueve nada a Reservado. Se crea un
+          PedidoVenta local cuyo destino es Disponible, y cuando el stock
+          Disponible alcance la cantidad pedida, se descuenta directamente
+          desde Disponible (vía _satisfacer_pedidos_completos).
         """
 
         # === Caso 1: STOCK SUFICIENTE -> descuenta solo de Disponible ===
@@ -738,14 +744,9 @@ class InventarioProductosService:
                 "tiempo_estimado": 0,
             }
 
-        # === Caso 2: STOCK INSUFICIENTE -> similar a Guardar pendiente local ===
-        mover = max(min(disponible, cantidad), 0)
-        faltante = cantidad - mover
-
-        reservado_reg = self._ensure_estado_registro(codigo, "Reservado")
-        if mover > 0:
-            # Bloquear lo disponible para esta venta futura
-            self.transferir(codigo, "Disponible", "Reservado", mover)
+        # === Caso 2: STOCK INSUFICIENTE ===
+        # No movemos nada a Reservado. Todo el pedido queda "esperando" en Disponible.
+        faltante = max(cantidad - disponible, 0)
 
         tiempo_estimado = 0
         orden_id = None
@@ -768,16 +769,20 @@ class InventarioProductosService:
                 else None
             )
 
+        # Pedido local cuyo destino es "Disponible": cuando haya stock suficiente
+        # se descontará directamente desde Disponible (sin pasar por Reservado).
         pedido = self._crear_pedido_venta(
             tipo="local",
             codigo=codigo,
             cantidad_solicitada=cantidad,
-            cantidad_atendida=mover,
-            cantidad_faltante=faltante,
-            estado_destino="Reservado",
+            cantidad_atendida=0,        # nada atendido todavía
+            cantidad_faltante=cantidad,  # todo el pedido pendiente
+            estado_destino="Disponible",
         )
 
-        reservado_reg = self.repository.get_by_id((codigo, "Reservado"))
+        # Intentamos satisfacer por si, excepcionalmente, ya hubiera stock suficiente
+        self._satisfacer_pedidos_completos(codigo)
+
         disponible_reg = self.repository.get_by_id((codigo, "Disponible"))
 
         return {
@@ -785,8 +790,8 @@ class InventarioProductosService:
             "metodo_entrega": "tienda",
             "modo": "directo",
             "cantidad_solicitada": cantidad,
-            "cantidad_en_reserva": reservado_reg.cantidad if reservado_reg else 0,
-            "cantidad_inmediata": mover,
+            "cantidad_en_reserva": 0,
+            "cantidad_inmediata": 0,
             "faltante_fabricado": faltante,
             "tiempo_estimado": tiempo_estimado,
             "pedido_id": pedido.id if pedido else None,
@@ -1322,6 +1327,11 @@ class InventarioProductosService:
 
         Importante: los pedidos ONLINE se ignoran aquí para no interferir con los
         flujos de Guardar pendiente / Finalizar venta de domicilio.
+
+        Soporta dos tipos de destino:
+        - "Reservado": mueve Disponible -> Reservado.
+        - "Disponible": descuenta directamente desde Disponible (venta directa
+          tienda con stock insuficiente).
         """
         pedidos = [
             p
@@ -1345,16 +1355,30 @@ class InventarioProductosService:
                 pedido.estado = "completado"
                 continue
 
-            if disponible >= requerido:
-                # mover todo el pedido al destino final (ej: Disponible -> Reservado)
-                self.transferir(codigo, "Disponible", pedido.estado_destino, requerido)
-                pedido.cantidad_atendida = pedido.cantidad_solicitada
-                pedido.cantidad_faltante = 0
-                pedido.estado = "completado"
+            # Solo atendemos pedidos COMPLETOS
+            if disponible < requerido:
+                break
+
+            destino = pedido.estado_destino  # ya viene normalizado desde _crear_pedido_venta
+
+            if destino == "Disponible":
+                # Consumo directo desde Disponible (no se mueve a otro estado)
+                if not disponible_reg or disponible_reg.cantidad < requerido:
+                    raise ValueError(
+                        f"Stock disponible inconsistente al cerrar pedido #{pedido.id}"
+                    )
+                disponible_reg.cantidad -= requerido
+                disponible -= requerido
+            else:
+                # Caso clásico: Disponible -> estado_destino (ej: Reservado)
+                self.transferir(codigo, "Disponible", destino, requerido)
                 disponible -= requerido
                 if disponible_reg:
+                    # reflejar el valor actualizado
                     disponible_reg.cantidad = disponible
-            else:
-                break
+
+            pedido.cantidad_atendida = pedido.cantidad_solicitada
+            pedido.cantidad_faltante = 0
+            pedido.estado = "completado"
 
         self.session.commit()
