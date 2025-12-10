@@ -857,19 +857,31 @@
     async function verificarPlan(codigo) {
       try {
         const qty = parseInt(document.getElementById(`qty-${codigo.toLowerCase()}`).value);
-        log(`🔍 Consultando plan de fabricación para ${codigo} x${qty}...`);
-        const plan = await getJson(`${host}/api/fabricacion/plan/${codigo}?cantidad=${qty}`);
-      log(`📋 Plan ${codigo}: fuente=${plan.fuente_datos || 'desconocida'}`, "inv");
-      log(`   Tiempo estimado: ${plan.tiempo_estimado} min`, "inv");
-      log(`   Materiales necesarios:`, "inv");
-        plan.materiales.forEach(m => {
-          const faltante = Math.max(m.cantidad_requerida - m.cantidad_disponible, 0);
+        log(`🔍 Calculando piezas para ${codigo} x${qty}...`);
+
+        const [calculo, piezasInventario] = await Promise.all([
+          getJson(`${host}/api/fabricacion/calcular_piezas`, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({codigo, cantidad: qty}),
+          }),
+          getJson(`${host}/api/piezas`),
+        ]);
+
+        const inventario = {};
+        (piezasInventario || []).forEach(p => { inventario[p.id_pieza] = p.cantidad; });
+
+        log(`📋 Piezas requeridas (calculadas por fábrica)`, "inv");
+        log(`   Cantidad solicitada: ${calculo.cantidad_solicitada}`, "inv");
+        (calculo.piezas || []).forEach(p => {
+          const disponible = inventario[p.codigo] || 0;
+          const faltante = Math.max(p.cantidad_total - disponible, 0);
           const status = faltante > 0 ? "⚠️ FALTA" : "✅ OK";
-          log(`   - ${m.id_pieza}: ${m.cantidad_requerida} req, ${m.cantidad_disponible} disp, ${faltante} faltante ${status}`, "inv");
+          log(`   - ${p.codigo}: total ${p.cantidad_total}, disponible ${disponible}, faltante ${faltante} ${status}`, "inv");
         });
-        log(`   Fuente: ${plan.fuente_datos || 'Plan interno'}`, "inv");
+        log(`   Nota: el tiempo estimado lo gestiona el servicio de fábrica externo`, "inv");
       } catch (err) {
-        log(`❌ Error consultando plan ${codigo}: ${err.message}`, "inv");
+        log(`❌ Error consultando cálculo ${codigo}: ${err.message}`, "inv");
       }
     }
 

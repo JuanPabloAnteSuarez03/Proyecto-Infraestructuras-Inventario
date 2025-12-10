@@ -228,9 +228,7 @@ POST /api/fabricacion/calcular_piezas
   "codigo": "S1",
   "cantidad": 100
 }
-
-# Consultar plan de fabricación
-GET /api/fabricacion/plan/S1?cantidad=100
+# (El cálculo de piezas lo hace la fábrica; evitar el antiguo GET /api/fabricacion/plan)
 ```
 
 ## 🔄 Sistema de Colas (Redis + RQ)

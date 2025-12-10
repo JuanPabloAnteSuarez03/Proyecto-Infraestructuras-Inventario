@@ -357,12 +357,15 @@ def test_movimientos_flow(client):
 
 def test_fabricacion_plan_y_produccion(client):
     crear_estados_producto(client, "S1")
-    plan_resp = client.get("/api/fabricacion/plan/S1?cantidad=100")
+    plan_resp = client.post(
+        "/api/fabricacion/calcular_piezas",
+        json={"codigo": "S1", "cantidad": 100},
+    )
     assert plan_resp.status_code == 200
     plan_data = plan_resp.json()
-    assert plan_data["id_producto"] == "S1"
+    assert plan_data["codigo"] == "S1"
     assert plan_data["cantidad_solicitada"] == 100
-    assert plan_data["materiales"]
+    assert plan_data["piezas"]
 
     produccion_resp = client.post(
         "/api/fabricacion/producciones",

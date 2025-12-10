@@ -138,3 +138,5 @@ external/fabricacion-api/
 external/*.zip
 external/fabricacion-api-main/
 external/fabricacion-apiv2/
+
+.venv/

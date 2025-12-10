@@ -214,8 +214,8 @@ Esta sección documenta todos los endpoints relacionados con el proceso de fabri
 
 | Método | Endpoint | Descripción | Tipo |
 |--------|----------|-------------|------|
-| `GET` | `/api/fabricacion/plan/{codigo}` | Obtener plan de fabricación | Consulta |
-| `POST` | `/api/fabricacion/calcular_piezas` | Calcular piezas necesarias | Operación |
+| `GET` | `/api/fabricacion/plan/{codigo}` | (Legacy) Plan de fabricación – preferir `/api/fabricacion/calcular_piezas` | Consulta |
+| `POST` | `/api/fabricacion/calcular_piezas` | Calcular piezas necesarias (delegado a fábrica externa) | Operación |
 | `POST` | `/api/fabricacion/producciones` | Producir lote | Operación |
 | `POST` | `/api/fabricacion/ordenes` | Crear orden de fabricación (202 Accepted) | Operación asíncrona |
 | `GET` | `/api/fabricacion/ordenes/{orden_id}` | Obtener orden específica | Consulta |
@@ -226,6 +226,8 @@ Esta sección documenta todos los endpoints relacionados con el proceso de fabri
 | `POST` | `/api/fabricacion/external/config` | Actualizar configuración externa | Configuración |
 | `GET` | `/api/fabricacion/external/planos/{plano_id}` | Obtener plano externo (proxy) | Proxy |
 | `POST` | `/api/fabricacion/webhook/productos_terminados` | Webhook de productos fabricados 🔔 | Webhook |
+
+> Nota: el cálculo de piezas lo realiza el servicio de fábrica externo; usar siempre `POST /api/fabricacion/calcular_piezas`. El endpoint `GET /api/fabricacion/plan/{codigo}` queda solo para compatibilidad.
 
 🔔 = Webhook para recibir notificaciones de API Externa de Fabricación
 

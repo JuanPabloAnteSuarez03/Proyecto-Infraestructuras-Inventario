@@ -120,24 +120,22 @@ def test_api_local():
     except Exception as e:
         print(f"✗ Error: {e}")
 
-    # Test 3: Obtener plan de fabricación
-    print_section("3. Obtener plan de fabricación (S1, cantidad=100)")
+    # Test 3: Calcular piezas de fabricación
+    print_section("3. Calcular piezas (S1, cantidad=100)")
     try:
-        resp = httpx.get(
-            f"{LOCAL_URL}/api/fabricacion/plan/S1",
-            params={"cantidad": 100},
+        resp = httpx.post(
+            f"{LOCAL_URL}/api/fabricacion/calcular_piezas",
+            json={"codigo": "S1", "cantidad": 100},
             timeout=10
         )
         if resp.status_code == 200:
             data = resp.json()
-            print(f"   ✓ Plan obtenido:")
-            print(f"      Producto: {data.get('id_producto')}")
+            print(f"   ✓ Piezas calculadas:")
+            print(f"      Producto: {data.get('codigo')}")
             print(f"      Cantidad: {data.get('cantidad_solicitada')}")
-            print(f"      Tiempo estimado: {data.get('tiempo_estimado')} min")
-            print(f"      Materiales:")
-            for mat in data.get('materiales', []):
-                print(f"         - {mat['id_pieza']}: {mat['cantidad_requerida']} requeridas, "
-                      f"{mat['cantidad_disponible']} disponibles")
+            for pieza in data.get("piezas", []):
+                print(f"         - {pieza.get('codigo')}: total {pieza.get('cantidad_total')} "
+                      f"({pieza.get('cantidad_por_unidad')} por unidad)")
         else:
             print(f"✗ Error: HTTP {resp.status_code}")
     except Exception as e:
@@ -164,7 +162,7 @@ def main():
 Endpoints disponibles en tu API local:
 
 Fabricación:
-  - GET  /api/fabricacion/plan/{codigo}?cantidad=X
+  - POST /api/fabricacion/calcular_piezas
   - POST /api/fabricacion/ordenes
   - GET  /api/fabricacion/ordenes
   - GET  /api/fabricacion/ordenes/{id}
