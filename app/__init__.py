@@ -3,8 +3,9 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from .routes import register_routes
 from .database import Base, engine, SessionLocal
 from .core.logging_config import setup_logging
@@ -175,7 +176,12 @@ def create_app(config_name: str | None = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.mount("/dashboard", StaticFiles(directory="ui", html=True), name="dashboard")
     register_routes(app)
+
+    @app.get("/")
+    def root():
+        return RedirectResponse(url="/dashboard/dashboard.html")
 
     @app.get("/health")
     def healthcheck():
